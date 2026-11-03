@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle Financeiro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 3D Glossy Black Liquid-Chrome Wave Background -->
+  <div class="ambient-canvas" aria-hidden="true">
+    <img src="bg-wave.jpg" alt="" class="ambient-wave-img" />
+    <div class="ambient-vignette"></div>
+  </div>
+
+  <div class="app-shell">
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <!-- Brand Header -->
+        <div class="app-brand">
+          <div class="app-brand-mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+            </svg>
+          </div>
+          <div class="app-brand-info">
+            <span class="app-brand-name">Meu Caixa</span>
+            <span class="app-brand-sub">Controle Pessoal</span>
+          </div>
+        </div>
+
+        <!-- Month Selector inside Sidebar -->
+        <div class="sidebar-month-picker">
+          <button type="button" class="month-nav-btn" id="prevMonthBtn" title="Mês anterior (←)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div class="month-nav-center" id="currentMonthTrigger" title="Clique para voltar ao mês atual">
+            <span class="month-nav-eyebrow">MÊS SELECIONADO</span>
+            <strong class="month-nav-label" id="currentMonthLabel">Novembro 2026</strong>
+          </div>
+          <button type="button" class="month-nav-btn" id="nextMonthBtn" title="Próximo mês (→)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="sidebar-nav" aria-label="Menu principal">
+          <div class="nav-group-label">PAINEL DO MÊS</div>
+
+          <button type="button" class="nav-tab is-active" data-tab="overview">
+            <span class="nav-tab-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Dashboard</span>
+          </button>
+
+          <button type="button" class="nav-tab" data-tab="salary">
+            <span class="nav-tab-icon nav-icon-emerald">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Salário & Renda</span>
+            <span class="nav-tab-badge mono" id="navBadgeSalary">R$ 0</span>
+          </button>
+
+          <button type="button" class="nav-tab" data-tab="fixed">
+            <span class="nav-tab-icon nav-icon-violet">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Gastos Fixos</span>
+            <span class="nav-tab-badge mono" id="navBadgeFixed">0</span>
+          </button>
+
+          <button type="button" class="nav-tab" data-tab="variable">
+            <span class="nav-tab-icon nav-icon-amber">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Gastos do Mês</span>
+            <span class="nav-tab-badge mono" id="navBadgeVariable">0</span>
+          </button>
+
+          <button type="button" class="nav-tab" data-tab="notes">
+            <span class="nav-tab-icon nav-icon-cyan">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h5"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Observações</span>
+            <span class="nav-tab-badge mono" id="navBadgeNotes">0</span>
+          </button>
+
+          <div class="nav-group-label" style="margin-top: 14px;">HISTÓRICO & ANÁLISE</div>
+
+          <button type="button" class="nav-tab" data-tab="annual">
+            <span class="nav-tab-icon nav-icon-blue">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3v18h18"/><rect width="4" height="7" x="7" y="10" rx="1"/><rect width="4" height="12" x="15" y="5" rx="1"/>
+              </svg>
+            </span>
+            <span class="nav-tab-text">Visão do Ano</span>
+            <span class="nav-tab-badge mono" id="navBadgeYear">2026</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Sidebar Live Wallet Status Widget -->
+      <div class="sidebar-bottom">
+        <div class="wallet-mini-card" id="sidebarWalletWidget">
+          <div class="wallet-mini-top">
+            <span class="wallet-mini-label" id="sidebarBalanceLabel">Saldo Restante</span>
+            <span class="wallet-mini-dot" id="sidebarBalanceDot"></span>
+          </div>
+          <div class="wallet-mini-amount mono" id="sidebarBalanceValue">R$ 0,00</div>
+          <div class="wallet-mini-bar">
+            <div class="wallet-mini-fill" id="sidebarBalanceFill" style="width: 0%"></div>
+          </div>
+          <div class="wallet-mini-meta" id="sidebarBalanceMeta">0% do salário livre</div>
+        </div>
+
+        <div class="sidebar-utility-row">
+          <button type="button" class="util-btn" id="exportDataBtn" title="Baixar backup dos dados">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            Backup
+          </button>
+          <label class="util-btn" for="importDataInput" title="Restaurar arquivo de backup">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            Importar
+            <input type="file" id="importDataInput" accept=".json" hidden />
+          </label>
+          <button type="button" class="util-btn util-btn-danger" id="resetAllDataBtn" title="Limpar tudo">
+            Zerar
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT AREA ==================== -->
+    <main class="main-stage">
+
+      <!-- =========================================================
+           TAB 1: DASHBOARD (OVERVIEW)
+      ========================================================== -->
+      <section class="tab-view is-active" id="tab-overview">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Dashboard — <span class="month-highlight">Novembro 2026</span></h1>
+          </div>
+          <div class="stage-actions">
+            <button type="button" class="btn btn-secondary" id="overviewAddFixedBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              Assinatura / Fixo
+            </button>
+            <button type="button" class="btn btn-primary" id="overviewAddVarBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              Lançar Gasto
+            </button>
+          </div>
+        </header>
+
+        <!-- Hero Verdict Card -->
+        <div class="hero-verdict" id="verdictBanner">
+          <div class="hero-verdict-main">
+            <h2 class="hero-verdict-title" id="verdictHeadline">Configure seu salário para ver quanto sobrou</h2>
+            <p class="hero-verdict-desc" id="verdictSubtext">Acompanhe seus ganhos, assinaturas fixas e gastos do dia a dia.</p>
+
+            <!-- Allocation Bar inside Hero -->
+            <div class="hero-allocation">
+              <div class="hero-bar-track">
+                <div class="hero-bar-seg seg-fixed" id="barFixed" style="width: 0%"></div>
+                <div class="hero-bar-seg seg-variable" id="barVariable" style="width: 0%"></div>
+                <div class="hero-bar-seg seg-remaining" id="barRemaining" style="width: 0%"></div>
+              </div>
+              <div class="hero-bar-legend">
+                <span class="legend-chip"><i class="dot-fixed"></i> Fixos: <b class="mono" id="legendFixedPct">0%</b></span>
+                <span class="legend-chip"><i class="dot-variable"></i> Gastos do Mês: <b class="mono" id="legendVariablePct">0%</b></span>
+                <span class="legend-chip"><i class="dot-remaining" id="legendRemainingSwatch"></i> <span id="legendRemainingLabel">Livre</span>: <b class="mono" id="legendRemainingPct">0%</b></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-verdict-spotlight">
+            <span class="spotlight-label" id="balanceCardTitle">QUANTO SOBROU NO MÊS</span>
+            <div class="spotlight-value mono" id="kpiBalanceValue">R$ 0,00</div>
+            <div class="spotlight-sub" id="kpiBalanceMeta">Total gasto: R$ 0,00</div>
+          </div>
+        </div>
+
+        <!-- 3 Interactive Summary Cards that jump to their tabs -->
+        <div class="overview-cards-row">
+          <div class="summary-tile" data-jump-tab="salary">
+            <div class="tile-top">
+              <span class="tile-tag tag-emerald">Salário & Renda</span>
+              <span class="tile-arrow">Abrir aba →</span>
+            </div>
+            <div class="tile-amount mono" id="kpiSalaryValue">R$ 0,00</div>
+            <div class="tile-foot" id="kpiSalaryMeta">Clique para editar seu salário</div>
+          </div>
+
+          <div class="summary-tile" data-jump-tab="fixed">
+            <div class="tile-top">
+              <span class="tile-tag tag-violet">Gastos Fixos (Assinaturas)</span>
+              <span class="tile-arrow" id="kpiFixedCountBadge">0 ativos →</span>
+            </div>
+            <div class="tile-amount mono" id="kpiFixedValue">R$ 0,00</div>
+            <div class="tile-foot" id="kpiFixedMeta">Descontados todos os meses</div>
+          </div>
+
+          <div class="summary-tile" data-jump-tab="variable">
+            <div class="tile-top">
+              <span class="tile-tag tag-amber">Gastos Não Fixos (Mês)</span>
+              <span class="tile-arrow" id="kpiVariableCountBadge">0 itens →</span>
+            </div>
+            <div class="tile-amount mono" id="kpiVariableValue">R$ 0,00</div>
+            <div class="tile-foot" id="kpiVariableMeta">Gastos variáveis deste mês</div>
+          </div>
+        </div>
+
+        <!-- Overview Two Columns: Assinaturas Ativas + Últimos Gastos & Categorias -->
+        <div class="overview-split">
+          <!-- Preview of Fixed Subscriptions with Logos -->
+          <div class="surface-box">
+            <div class="surface-head">
+              <div>
+                <h3 class="surface-title">Suas Assinaturas & Contas Fixas</h3>
+                <p class="surface-sub">Descontadas todo mês automaticamente</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" data-jump-tab="fixed">Gerenciar todos</button>
+            </div>
+            <div class="brand-grid-preview" id="overviewFixedPreview">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Preview of Recent Variable Expenses + Top Categories -->
+          <div class="surface-box">
+            <div class="surface-head">
+              <div>
+                <h3 class="surface-title">Últimos Gastos do Mês</h3>
+                <p class="surface-sub">Gastos variáveis mais recentes e categorias</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" data-jump-tab="variable">Ver extrato completo</button>
+            </div>
+            <div class="recent-list-preview" id="overviewVariablePreview">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           TAB 2: SALÁRIO & RENDA
+      ========================================================== -->
+      <section class="tab-view" id="tab-salary">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Salário & Renda de <span class="month-highlight">Novembro 2026</span></h1>
+          </div>
+        </header>
+
+        <div class="salary-workspace">
+          <!-- Left: Interactive Form to edit Salary & Extra Income directly -->
+          <form id="inlineSalaryForm" class="surface-box salary-editor-box">
+            <div class="surface-head">
+              <div>
+                <h3 class="surface-title">Configurar Ganhos do Mês</h3>
+                <p class="surface-sub">Preencha quanto você recebe para calcular exatamente quanto sobra no fim do mês.</p>
+              </div>
+            </div>
+
+            <div class="salary-form-body">
+              <div class="field-block">
+                <label for="inlineSalaryInput">Salário Líquido Mensal (R$)</label>
+                <div class="big-currency-input">
+                  <span class="mono">R$</span>
+                  <input type="number" step="0.01" min="0" id="inlineSalaryInput" class="mono" placeholder="0,00" required />
+                </div>
+                <div class="quick-salary-chips">
+                  <span class="chip-hint">Valores rápidos:</span>
+                  <button type="button" class="quick-val-btn mono" data-set-salary="2500">R$ 2.500</button>
+                  <button type="button" class="quick-val-btn mono" data-set-salary="3500">R$ 3.500</button>
+                  <button type="button" class="quick-val-btn mono" data-set-salary="5000">R$ 5.000</button>
+                  <button type="button" class="quick-val-btn mono" data-set-salary="7500">R$ 7.500</button>
+                  <button type="button" class="quick-val-btn mono" data-set-salary="10000">R$ 10.000</button>
+                </div>
+              </div>
+
+              <label class="toggle-row">
+                <input type="checkbox" id="inlineSalaryDefaultCheck" checked />
+                <span>Manter este salário como padrão para todos os meses</span>
+              </label>
+
+              <div class="divider-line"></div>
+
+              <div class="field-row-2">
+                <div class="field-block">
+                  <label for="inlineExtraInput">Renda Extra neste mês (R$)</label>
+                  <div class="currency-input-wrap">
+                    <span class="currency-prefix mono">R$</span>
+                    <input type="number" step="0.01" min="0" id="inlineExtraInput" class="input-field mono" placeholder="0,00" />
+                  </div>
+                </div>
+                <div class="field-block">
+                  <label for="inlineExtraNoteInput">Origem da Renda Extra / Observação</label>
+                  <input type="text" id="inlineExtraNoteInput" class="input-field" placeholder="Ex: Freela, bônus, 13º, venda..." />
+                </div>
+              </div>
+
+              <div class="salary-form-actions">
+                <button type="submit" class="btn btn-primary">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="20 6 9 17 4 12"/></svg>
+                  Salvar Salário e Atualizar Cálculos
+                </button>
+                <span class="save-toast" id="salarySavedFeedback">Salvo com sucesso!</span>
+              </div>
+            </div>
+          </form>
+
+          <!-- Right: Financial Diagnostics & Savings Goal Simulator -->
+          <div class="salary-diagnostics-col">
+            <div class="surface-box">
+              <div class="surface-head">
+                <div>
+                  <h3 class="surface-title">Raio-X do Seu Salário</h3>
+                  <p class="surface-sub">Para onde está indo seu dinheiro neste mês</p>
+                </div>
+              </div>
+              <div class="closing-ledger">
+                <div class="ledger-row">
+                  <span class="ledger-label">Salário Base</span>
+                  <span class="ledger-val mono text-emerald" id="ledgerBaseSalary">+ R$ 0,00</span>
+                </div>
+                <div class="ledger-row" id="ledgerExtraRow">
+                  <span class="ledger-label">Renda Extra do Mês</span>
+                  <span class="ledger-val mono text-emerald" id="ledgerExtraIncome">+ R$ 0,00</span>
+                </div>
+                <div class="ledger-divider"></div>
+                <div class="ledger-row">
+                  <span class="ledger-label">(-) Gastos Fixos / Assinaturas</span>
+                  <span class="ledger-val mono text-violet" id="ledgerFixedOut">- R$ 0,00</span>
+                </div>
+                <div class="ledger-row">
+                  <span class="ledger-label">(-) Gastos Não Fixos do Mês</span>
+                  <span class="ledger-val mono text-amber" id="ledgerVariableOut">- R$ 0,00</span>
+                </div>
+                <div class="ledger-divider"></div>
+                <div class="ledger-row ledger-row-total">
+                  <span class="ledger-label" id="ledgerFinalLabel">Resultado Final (Sobrou)</span>
+                  <span class="ledger-val mono" id="ledgerFinalBalance">R$ 0,00</span>
+                </div>
+              </div>
+
+              <!-- Interactive Savings Simulator -->
+              <div class="simulator-box">
+                <div class="simulator-top">
+                  <span>Simulador: Meta de guardar do salário</span>
+                  <strong class="mono text-emerald" id="simGoalPctLabel">20%</strong>
+                </div>
+                <input type="range" min="0" max="100" step="1" value="20" id="simGoalSlider" class="range-slider" />
+                <div class="simulator-metrics">
+                  <div class="sim-metric">
+                    <label for="simManualGoalInput" style="font-size:11.5px;color:var(--text-muted);cursor:pointer;">Meta para guardar (R$)</label>
+                    <div class="currency-input-wrap" style="margin-top:4px;">
+                      <span class="currency-prefix mono" style="left:8px;font-size:12px;">R$</span>
+                      <input type="number" step="0.01" min="0" id="simManualGoalInput" class="input-field mono" style="padding:6px 8px 6px 28px;font-weight:700;font-size:13.5px;" placeholder="0,00" />
+                    </div>
+                  </div>
+                  <div class="sim-metric" style="justify-content:center;">
+                    <span>Teto para gastos variáveis</span>
+                    <strong class="mono" id="simSafeVarLimit" style="font-size:15px;margin-top:6px;">R$ 0,00</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           TAB 3: GASTOS FIXOS (ASSINATURAS & CONTAS MENSAIS)
+      ========================================================== -->
+      <section class="tab-view" id="tab-fixed">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Gastos Fixos & Assinaturas</h1>
+          </div>
+          <div class="stage-actions">
+            <div class="header-stat-pill">
+              <strong class="mono text-emerald" id="fixedPaidSummary">0/0 descontados neste mês</strong>
+            </div>
+            <div class="header-stat-pill">
+              <span>Total Fixo Mensal:</span>
+              <strong class="mono text-violet" id="panelFixedTotal">R$ 0,00</strong>
+            </div>
+            <button type="button" class="btn btn-primary" id="openFixedModalBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              Adicionar Gasto Fixo
+            </button>
+          </div>
+        </header>
+
+        <!-- Fixed Expenses List with Brand Logos -->
+        <div class="surface-box">
+          <div class="expense-list" id="fixedExpensesList">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           TAB 4: GASTOS DO MÊS (NÃO FIXOS / VARIÁVEIS)
+      ========================================================== -->
+      <section class="tab-view" id="tab-variable">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Gastos Não Fixos de <span class="month-highlight">Novembro 2026</span></h1>
+          </div>
+          <div class="stage-actions">
+            <div class="header-stat-pill">
+              <span>Total Variável no Mês:</span>
+              <strong class="mono text-amber" id="panelVariableTotal">R$ 0,00</strong>
+            </div>
+            <button type="button" class="btn btn-primary" id="openVariableModalBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+              Lançar Gasto
+            </button>
+          </div>
+        </header>
+
+        <!-- Filter & Search + Variable Expenses List -->
+        <div class="surface-box">
+          <div class="panel-toolbar panel-toolbar-filters">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="variableSearchInput" placeholder="Buscar por nome, categoria ou observação..." autocomplete="off" />
+            </div>
+            <select id="variableCategoryFilter" class="select-compact" aria-label="Filtrar categoria">
+              <option value="all">Todas as categorias</option>
+              <option value="Alimentação">Alimentação / Restaurante</option>
+              <option value="Combustível / Transporte">Combustível / Transporte</option>
+              <option value="Supermercado">Supermercado</option>
+              <option value="Lazer">Lazer</option>
+              <option value="Compras">Compras</option>
+              <option value="Farmácia">Farmácia</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Casa">Casa</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+
+          <div class="expense-list" id="variableExpensesList">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           TAB 5: OBSERVAÇÕES & NOTAS
+      ========================================================== -->
+      <section class="tab-view" id="tab-notes">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Observações de <span class="month-highlight">Novembro 2026</span></h1>
+          </div>
+          <div class="stage-actions">
+            <span class="autosave-status" id="notepadSaveStatus">Salvo automaticamente</span>
+          </div>
+        </header>
+
+        <div class="notes-workspace">
+          <!-- Left: Freeform Notepad -->
+          <div class="surface-box notepad-container">
+            <div class="surface-head">
+              <div>
+                <h3 class="surface-title">Bloco de Notas do Mês</h3>
+                <p class="surface-sub">Escreva livremente metas, justificativas de gastos, planejamento ou contas a acertar.</p>
+              </div>
+            </div>
+            <textarea
+              id="monthlyNotepad"
+              class="notepad-textarea"
+              placeholder="Digite suas observações de Novembro... Ex: Neste mês gastei mais com combustível por conta da viagem; lembrar de cancelar assinatura de streaming dia 20..."
+            ></textarea>
+          </div>
+
+          <!-- Right: Structured Reminders + All Expense Observations -->
+          <div class="notes-right-col">
+            <div class="surface-box">
+              <div class="surface-head">
+                <div>
+                  <h3 class="surface-title">Lembretes & Observações Pontuais</h3>
+                  <p class="surface-sub">Crie cartões de alerta ou metas (para este mês ou fixados no ano todo).</p>
+                </div>
+              </div>
+              <div class="structured-notes-body">
+                <form id="addObservationForm" class="obs-form">
+                  <div class="obs-form-row">
+                    <select id="obsTagSelect" class="select-compact" aria-label="Tipo">
+                      <option value="Lembrete">Lembrete</option>
+                      <option value="Importante">Importante</option>
+                      <option value="Meta">Meta</option>
+                      <option value="Alerta">Alerta</option>
+                    </select>
+                    <input type="text" id="obsTextInput" class="input-compact" placeholder="Escreva uma observação..." required />
+                    <button type="submit" class="btn btn-primary btn-sm">Adicionar</button>
+                  </div>
+                  <label class="checkbox-inline">
+                    <input type="checkbox" id="obsPinAllMonths" />
+                    <span>Manter visível em todos os meses</span>
+                  </label>
+                </form>
+
+                <div class="obs-list" id="observationsList">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div class="surface-box">
+              <div class="surface-head">
+                <div>
+                  <h3 class="surface-title">Observações Anotadas nos Gastos</h3>
+                  <p class="surface-sub">Todos os gastos deste mês que possuem uma observação escrita</p>
+                </div>
+              </div>
+              <div class="expense-notes-feed" id="expenseNotesFeed">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================
+           TAB 6: VISÃO DO ANO (ANUAL)
+      ========================================================== -->
+      <section class="tab-view" id="tab-annual">
+        <header class="stage-header">
+          <div>
+            <h1 class="stage-title">Visão Anual — <span id="annualYearTitle">2026</span></h1>
+          </div>
+          <div class="stage-actions">
+            <div class="year-switcher">
+              <button type="button" class="month-nav-btn" id="prevYearBtn" title="Ano anterior">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <span class="year-switcher-label mono" id="yearSwitcherLabel">2026</span>
+              <button type="button" class="month-nav-btn" id="nextYearBtn" title="Próximo ano">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Annual KPI Row -->
+        <div class="annual-kpi-grid">
+          <div class="surface-box annual-kpi-card">
+            <span class="annual-kpi-label">Ganhos no Ano (Salários + Extras)</span>
+            <strong class="annual-kpi-val mono text-emerald" id="annualTotalIncome">R$ 0,00</strong>
+            <span class="annual-kpi-sub" id="annualIncomeSub">Soma dos meses do ano</span>
+          </div>
+          <div class="surface-box annual-kpi-card">
+            <span class="annual-kpi-label">Gastos Fixos no Ano (12 meses)</span>
+            <strong class="annual-kpi-val mono text-violet" id="annualTotalFixed">R$ 0,00</strong>
+            <span class="annual-kpi-sub" id="annualFixedSub">Impacto anual das assinaturas</span>
+          </div>
+          <div class="surface-box annual-kpi-card">
+            <span class="annual-kpi-label">Gastos Não Fixos no Ano</span>
+            <strong class="annual-kpi-val mono text-amber" id="annualTotalVariable">R$ 0,00</strong>
+            <span class="annual-kpi-sub">Total de gastos variáveis lançados</span>
+          </div>
+          <div class="surface-box annual-kpi-card">
+            <span class="annual-kpi-label">Saldo Acumulado do Ano</span>
+            <strong class="annual-kpi-val mono" id="annualTotalBalance">R$ 0,00</strong>
+            <span class="annual-kpi-sub" id="annualBalanceSub">Resultado líquido anual</span>
+          </div>
+        </div>
+
+        <!-- 12-Month Interactive Bar Chart -->
+        <div class="surface-box annual-chart-box">
+          <div class="surface-head">
+            <div>
+              <h3 class="surface-title">Comparativo Mês a Mês</h3>
+              <p class="surface-sub">Clique em qualquer mês para abrir os lançamentos daquele mês</p>
+            </div>
+            <div class="chart-legend">
+              <span><i class="dot-income"></i> Salário</span>
+              <span><i class="dot-fixed"></i> Fixos</span>
+              <span><i class="dot-variable"></i> Não Fixos</span>
+            </div>
+          </div>
+          <div class="annual-bars-stage" id="annualBarsStage">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- 12 Months Detailed Cards Grid -->
+        <div class="annual-months-grid" id="annualMonthsGrid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== MODAL: ADICIONAR / EDITAR GASTO FIXO ==================== -->
+  <div class="modal-backdrop" id="fixedExpenseModal" aria-hidden="true">
+    <div class="modal-card modal-wide" role="dialog" aria-labelledby="fixedModalTitle">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="fixedModalTitle">Novo Gasto Fixo / Assinatura</h3>
+        </div>
+        <button type="button" class="icon-btn" data-close-modal="fixedExpenseModal" aria-label="Fechar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="fixedExpenseForm" class="modal-body">
+        <input type="hidden" id="fixedExpenseId" />
+        <input type="hidden" id="fixedIconKeyInput" value="" />
+
+        <div class="form-group">
+          <div class="icon-picker-head">
+            <label for="fixedIconSearchInput">Escolha o Tópico, Logo ou Símbolo</label>
+            <div class="icon-picker-search">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="fixedIconSearchInput" placeholder="Pesquisar tópico (ex: Google, Spotify, Luz, Academia)..." autocomplete="off" />
+            </div>
+          </div>
+          <div class="icon-picker-grid" id="fixedModalIconPicker">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="fixedNameInput">Nome da Assinatura / Conta Fixa</label>
+            <input type="text" id="fixedNameInput" class="input-field" placeholder="Ex: Spotify, Amazon Prime, Aluguel, Luz..." required />
+          </div>
+          <div class="form-group">
+            <label for="fixedAmountInput">Valor Mensal (R$)</label>
+            <div class="currency-input-wrap">
+              <span class="currency-prefix mono">R$</span>
+              <input type="number" step="0.01" min="0.01" id="fixedAmountInput" class="input-field mono" placeholder="0,00" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="fixedCategoryInput">Categoria</label>
+            <select id="fixedCategoryInput" class="input-field">
+              <option value="Assinatura / Streaming">Assinatura / Streaming</option>
+              <option value="Moradia / Contas">Moradia / Contas</option>
+              <option value="Internet & Celular">Internet & Celular</option>
+              <option value="Saúde & Academia">Saúde & Academia</option>
+              <option value="Educação">Educação</option>
+              <option value="Seguros / Impostos">Seguros / Impostos</option>
+              <option value="Outros Fixos">Outros Fixos</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="fixedMethodInput">Forma de Cobrança</label>
+            <select id="fixedMethodInput" class="input-field">
+              <option value="Cartão de Crédito (Fatura)">Cartão de Crédito (Fatura)</option>
+              <option value="Débito Automático">Débito Automático</option>
+              <option value="PIX / Boleto">PIX / Boleto</option>
+              <option value="Desconto em Folha">Desconto em Folha</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="fixedNoteInput">Observação (Opcional)</label>
+          <input type="text" id="fixedNoteInput" class="input-field" placeholder="Ex: Plano família, dividido com 2 pessoas..." />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close-modal="fixedExpenseModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Gasto Fixo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADICIONAR / EDITAR GASTO VARIÁVEL ==================== -->
+  <div class="modal-backdrop" id="variableExpenseModal" aria-hidden="true">
+    <div class="modal-card modal-wide" role="dialog" aria-labelledby="variableModalTitle">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="variableModalTitle">Lançar Gasto do Mês</h3>
+        </div>
+        <button type="button" class="icon-btn" data-close-modal="variableExpenseModal" aria-label="Fechar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="variableExpenseForm" class="modal-body">
+        <input type="hidden" id="variableExpenseId" />
+        <input type="hidden" id="variableIconKeyInput" value="" />
+
+        <div class="form-group">
+          <div class="icon-picker-head">
+            <label for="variableIconSearchInput">Escolha o Tópico, Símbolo ou Logo</label>
+            <div class="icon-picker-search">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="text" id="variableIconSearchInput" placeholder="Pesquisar tópico (ex: Gasolina, Farmácia, Saúde, Shopee)..." autocomplete="off" />
+            </div>
+          </div>
+          <div class="icon-picker-grid" id="variableModalIconPicker">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="variableNameInput">Descrição do Gasto</label>
+            <input type="text" id="variableNameInput" class="input-field" placeholder="Ex: Gasolina Posto Ipiranga, Jantar Outback, Supermercado..." required />
+          </div>
+          <div class="form-group">
+            <label for="variableAmountInput">Valor (R$)</label>
+            <div class="currency-input-wrap">
+              <span class="currency-prefix mono">R$</span>
+              <input type="number" step="0.01" min="0.01" id="variableAmountInput" class="input-field mono" placeholder="0,00" required />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="variableDateInput">Data</label>
+            <input type="date" id="variableDateInput" class="input-field mono" required />
+          </div>
+          <div class="form-group">
+            <label for="variableCategoryInput">Categoria</label>
+            <select id="variableCategoryInput" class="input-field">
+              <option value="Alimentação">Alimentação</option>
+              <option value="Combustível / Transporte">Combustível / Transporte</option>
+              <option value="Supermercado">Supermercado</option>
+              <option value="Lazer">Lazer</option>
+              <option value="Compras">Compras</option>
+              <option value="Farmácia">Farmácia</option>
+              <option value="Saúde">Saúde</option>
+              <option value="Casa">Casa</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="variableMethodInput">Pagamento</label>
+            <select id="variableMethodInput" class="input-field">
+              <option value="PIX">PIX</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Débito">Débito</option>
+              <option value="Dinheiro">Dinheiro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="variableNoteInput">Observação (Opcional)</label>
+          <input type="text" id="variableNoteInput" class="input-field" placeholder="Ex: Tanque cheio para viajar, jantar comemorativo..." />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close-modal="variableExpenseModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Gasto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
