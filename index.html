@@ -8,12 +8,106 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <!-- 3D Glossy Black Liquid-Chrome Wave Background -->
   <div class="ambient-canvas" aria-hidden="true">
     <img src="bg-wave.jpg" alt="" class="ambient-wave-img" />
     <div class="ambient-vignette"></div>
+  </div>
+
+  <!-- ==================== GOOGLE LOGIN / ACCOUNT CHOOSER OVERLAY ==================== -->
+  <div class="auth-overlay" id="authOverlay" aria-hidden="false">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-brand-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+            <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+          </svg>
+        </div>
+        <h1 class="auth-title">Meu Caixa</h1>
+        <p class="auth-subtitle">Entre com sua conta do Google para manter seus gastos salvos em contas separadas</p>
+      </div>
+
+      <!-- Official Google Identity Services Button (shown when Client ID is configured) -->
+      <div id="googleGsiWrapper" class="auth-gsi-wrapper" style="display: none;">
+        <div id="googleGsiButtonContainer"></div>
+      </div>
+
+      <!-- Saved Google Accounts on this device ("Escolha uma conta") -->
+      <div id="savedAccountsSection" class="saved-accounts-section" style="display: none;">
+        <div class="saved-accounts-label">Escolha uma conta Google</div>
+        <div class="saved-accounts-list" id="savedAccountsList">
+          <!-- Populated by JS -->
+        </div>
+        <button type="button" class="auth-switch-mode-btn" id="useAnotherAccountBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+          Usar outra conta do Google
+        </button>
+      </div>
+
+      <!-- Google Account Sign-In Form -->
+      <form id="googleLoginForm" class="auth-form">
+        <div class="google-badge-header">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          <span>Fazer login com o Google</span>
+        </div>
+
+        <div class="form-group">
+          <label for="authNameInput">Seu Nome</label>
+          <input type="text" id="authNameInput" class="input-field" placeholder="Ex: Richard ou Nome da Namorada" required />
+        </div>
+
+        <div class="form-group">
+          <label for="authEmailInput">E-mail do Google (Gmail)</label>
+          <input type="email" id="authEmailInput" class="input-field" placeholder="seuemail@gmail.com" required />
+        </div>
+
+        <div class="form-group">
+          <label for="authPinInput">Senha / PIN de acesso (opcional)</label>
+          <input type="password" id="authPinInput" class="input-field" placeholder="Crie ou digite sua senha (opcional)" autocomplete="current-password" />
+        </div>
+
+        <div id="authErrorMsg" class="auth-error-msg" style="display: none;"></div>
+
+        <button type="submit" class="btn-google-signin">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          <span>Continuar com o Google</span>
+        </button>
+
+        <button type="button" class="btn btn-ghost btn-sm" id="backToSavedAccountsBtn" style="display: none; width: 100%; margin-top: 4px;">
+          ← Voltar para contas salvas
+        </button>
+      </form>
+
+      <!-- Optional Official Google OAuth Client ID Config -->
+      <div class="auth-oauth-config">
+        <button type="button" class="auth-oauth-toggle" id="toggleOauthConfigBtn">
+          Configurar Pop-up Oficial Google OAuth (Client ID)
+        </button>
+        <div id="oauthConfigBox" class="oauth-config-box" style="display: none;">
+          <p class="oauth-config-help">
+            Para usar o pop-up oficial do Google na Vercel, cole seu <b>Google Client ID</b> (criado em <i>console.cloud.google.com → APIs & Services → Credentials</i>):
+          </p>
+          <div class="oauth-config-row">
+            <input type="text" id="googleClientIdInput" class="input-compact" placeholder="xxxx.apps.googleusercontent.com" />
+            <button type="button" class="btn btn-secondary btn-sm" id="saveGoogleClientIdBtn">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="app-shell">
@@ -117,6 +211,22 @@
 
       <!-- Sidebar Live Wallet Status Widget -->
       <div class="sidebar-bottom">
+        <!-- Logged-in Google Account Card -->
+        <div class="user-account-card" id="sidebarUserCard">
+          <div class="user-account-left">
+            <div class="user-avatar" id="sidebarUserAvatar">R</div>
+            <div class="user-account-info">
+              <span class="user-account-name" id="sidebarUserName">Minha Conta</span>
+              <span class="user-account-email" id="sidebarUserEmail">google@gmail.com</span>
+            </div>
+          </div>
+          <button type="button" class="user-logout-btn" id="logoutUserBtn" title="Trocar de conta ou sair">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>
+            </svg>
+          </button>
+        </div>
+
         <div class="wallet-mini-card" id="sidebarWalletWidget">
           <div class="wallet-mini-top">
             <span class="wallet-mini-label" id="sidebarBalanceLabel">Saldo Restante</span>

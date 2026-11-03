@@ -495,17 +495,78 @@ const API_BASE = 'http://localhost:3333';
 const IDB_NAME = 'MeuCaixaBancoLocalDB';
 const IDB_STORE = 'estado_financeiro';
 
+const AUTH_CURRENT_USER_KEY = 'meu_caixa_current_user_v2';
+const AUTH_SAVED_ACCOUNTS_KEY = 'meu_caixa_saved_accounts_v2';
+const GOOGLE_CLIENT_ID_KEY = 'meu_caixa_google_client_id';
+
+let currentUser = loadCurrentUser();
 let currentMonthKey = getTodayMonthKey();
 let selectedYear = Number(currentMonthKey.split('-')[0]);
 let activeTab = 'overview';
 let state = loadState();
 
+function loadCurrentUser() {
+  try {
+    const raw = localStorage.getItem(AUTH_CURRENT_USER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.email) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getSavedAccounts() {
+  try {
+    const raw = localStorage.getItem(AUTH_SAVED_ACCOUNTS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAccountToRegistry(account) {
+  const list = getSavedAccounts();
+  const cleanEmail = account.email.trim().toLowerCase();
+  const idx = list.findIndex((a) => a.email.toLowerCase() === cleanEmail);
+  const entry = {
+    name: account.name.trim(),
+    email: cleanEmail,
+    picture: account.picture || '',
+    pinHash: account.pinHash || (idx !== -1 ? list[idx].pinHash || '' : ''),
+    lastLoginAt: new Date().toISOString()
+  };
+  if (idx !== -1) {
+    list[idx] = entry;
+  } else {
+    list.unshift(entry);
+  }
+  localStorage.setItem(AUTH_SAVED_ACCOUNTS_KEY, JSON.stringify(list));
+}
+
+function getUserStorageKey() {
+  if (currentUser && currentUser.email) {
+    return `${STORAGE_KEY}_${currentUser.email.trim().toLowerCase()}`;
+  }
+  return STORAGE_KEY;
+}
+
+function getUserIdbKey() {
+  if (currentUser && currentUser.email) {
+    return `user_${currentUser.email.trim().toLowerCase()}`;
+  }
+  return 'main';
+}
+
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = getUserStorageKey();
+    const raw = localStorage.getItem(key);
     if (!raw) {
       const empty = getEmptyState();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(empty));
+      localStorage.setItem(key, JSON.stringify(empty));
       return empty;
     }
     const parsed = JSON.parse(raw);
@@ -520,9 +581,10 @@ function loadState() {
   }
 }
 
-// Persistência em IndexedDB do navegador (além do SQLite em disco e localStorage)
+// Persistência em IndexedDB do navegador (separada por conta Google)
 function saveToIndexedDB(data) {
   try {
+    const idbKey = getUserIdbKey();
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
@@ -533,7 +595,7 @@ function saveToIndexedDB(data) {
     req.onsuccess = (e) => {
       const db = e.target.result;
       const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(JSON.parse(JSON.stringify(data)), 'main');
+      tx.objectStore(IDB_STORE).put(JSON.parse(JSON.stringify(data)), idbKey);
     };
   } catch {}
 }
@@ -541,6 +603,7 @@ function saveToIndexedDB(data) {
 function loadFromIndexedDB() {
   return new Promise((resolve) => {
     try {
+      const idbKey = getUserIdbKey();
       const req = indexedDB.open(IDB_NAME, 1);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
@@ -551,7 +614,7 @@ function loadFromIndexedDB() {
       req.onsuccess = (e) => {
         const db = e.target.result;
         const tx = db.transaction(IDB_STORE, 'readonly');
-        const getReq = tx.objectStore(IDB_STORE).get('main');
+        const getReq = tx.objectStore(IDB_STORE).get(idbKey);
         getReq.onsuccess = () => resolve(getReq.result || null);
         getReq.onerror = () => resolve(null);
       };
@@ -568,7 +631,12 @@ async function syncStateToSQLite() {
     await fetch(`${API_BASE}/api/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state })
+      body: JSON.stringify({
+        userEmail: currentUser ? currentUser.email : '',
+        userName: currentUser ? currentUser.name : '',
+        userPicture: currentUser ? currentUser.picture || '' : '',
+        state
+      })
     });
   } catch (err) {
     // Fallback silencioso para IndexedDB + localStorage
@@ -576,6 +644,7 @@ async function syncStateToSQLite() {
 }
 
 async function initSQLiteDatabase() {
+  const storageKey = getUserStorageKey();
   if (!IS_LOCAL_ENV) {
     const idbData = await loadFromIndexedDB();
     if (idbData && typeof idbData === 'object') {
@@ -590,7 +659,7 @@ async function initSQLiteDatabase() {
           pinnedObservations: Array.isArray(idbData.pinnedObservations) ? idbData.pinnedObservations : [],
           months: idbData.months && typeof idbData.months === 'object' ? idbData.months : {}
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(storageKey, JSON.stringify(state));
         renderAll();
       }
     }
@@ -599,7 +668,8 @@ async function initSQLiteDatabase() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/state`);
+    const userQuery = currentUser && currentUser.email ? `?user=${encodeURIComponent(currentUser.email)}` : '';
+    const res = await fetch(`${API_BASE}/api/state${userQuery}`);
     if (!res.ok) throw new Error('Servidor SQLite offline');
     const payload = await res.json();
     if (payload && payload.ok) {
@@ -612,7 +682,7 @@ async function initSQLiteDatabase() {
           pinnedObservations: Array.isArray(payload.state.pinnedObservations) ? payload.state.pinnedObservations : [],
           months: payload.state.months && typeof payload.state.months === 'object' ? payload.state.months : {}
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(storageKey, JSON.stringify(state));
         saveToIndexedDB(state);
         renderAll();
       }
@@ -623,7 +693,7 @@ async function initSQLiteDatabase() {
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(getUserStorageKey(), JSON.stringify(state));
   saveToIndexedDB(state);
   syncStateToSQLite();
 }
@@ -1437,12 +1507,303 @@ function changeMonth(delta) {
 }
 
 // ============================================================================
+// GOOGLE AUTHENTICATION & MULTI-ACCOUNT SYSTEM
+// ============================================================================
+function decodeGoogleJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function renderSidebarUserCard() {
+  const nameEl = document.getElementById('sidebarUserName');
+  const emailEl = document.getElementById('sidebarUserEmail');
+  const avatarEl = document.getElementById('sidebarUserAvatar');
+  if (!nameEl || !emailEl || !avatarEl) return;
+
+  if (!currentUser) {
+    nameEl.textContent = 'Não conectado';
+    emailEl.textContent = 'Faça login com o Google';
+    avatarEl.innerHTML = 'G';
+    return;
+  }
+
+  nameEl.textContent = currentUser.name || 'Usuário';
+  emailEl.textContent = currentUser.email || '';
+
+  if (currentUser.picture) {
+    avatarEl.innerHTML = `<img src="${escapeHTML(currentUser.picture)}" alt="${escapeHTML(currentUser.name)}" referrerpolicy="no-referrer" />`;
+  } else {
+    const initial = (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase();
+    avatarEl.innerHTML = escapeHTML(initial);
+  }
+}
+
+async function completeUserLogin(account) {
+  const cleanUser = {
+    name: String(account.name || '').trim() || account.email.split('@')[0],
+    email: String(account.email || '').trim().toLowerCase(),
+    picture: account.picture || ''
+  };
+
+  currentUser = cleanUser;
+  localStorage.setItem(AUTH_CURRENT_USER_KEY, JSON.stringify(cleanUser));
+  saveAccountToRegistry({
+    ...cleanUser,
+    pinHash: account.pinHash || ''
+  });
+
+  // Hide login overlay
+  const overlay = document.getElementById('authOverlay');
+  if (overlay) {
+    overlay.classList.add('is-hidden');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  // Load this user's isolated state and sync with SQLite / IndexedDB
+  state = loadState();
+  renderSidebarUserCard();
+  renderAll();
+  await initSQLiteDatabase();
+}
+
+function logoutUser() {
+  currentUser = null;
+  localStorage.removeItem(AUTH_CURRENT_USER_KEY);
+  renderSidebarUserCard();
+  showAuthOverlay();
+}
+
+function showAuthOverlay(forceForm = false) {
+  const overlay = document.getElementById('authOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-hidden');
+  overlay.setAttribute('aria-hidden', 'false');
+
+  const errEl = document.getElementById('authErrorMsg');
+  if (errEl) errEl.style.display = 'none';
+
+  const savedAccounts = getSavedAccounts();
+  const savedSection = document.getElementById('savedAccountsSection');
+  const savedList = document.getElementById('savedAccountsList');
+  const loginForm = document.getElementById('googleLoginForm');
+  const backBtn = document.getElementById('backToSavedAccountsBtn');
+
+  if (savedAccounts.length > 0 && !forceForm) {
+    savedSection.style.display = 'flex';
+    loginForm.style.display = 'none';
+    backBtn.style.display = 'inline-flex';
+
+    savedList.innerHTML = savedAccounts
+      .map((acc) => {
+        const initial = (acc.name || acc.email || 'G').trim().charAt(0).toUpperCase();
+        const avatarHTML = acc.picture
+          ? `<img src="${escapeHTML(acc.picture)}" alt="" referrerpolicy="no-referrer" />`
+          : escapeHTML(initial);
+
+        return `
+          <div class="saved-account-item" data-login-email="${escapeHTML(acc.email)}">
+            <div class="saved-account-left">
+              <div class="user-avatar">${avatarHTML}</div>
+              <div class="saved-account-info">
+                <span class="saved-account-name">${escapeHTML(acc.name)}</span>
+                <span class="saved-account-email">${escapeHTML(acc.email)}${acc.pinHash ? ' · 🔒 Com senha' : ''}</span>
+              </div>
+            </div>
+            <button type="button" class="saved-account-remove" data-remove-account="${escapeHTML(acc.email)}" title="Remover conta da lista">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        `;
+      })
+      .join('');
+  } else {
+    savedSection.style.display = 'none';
+    loginForm.style.display = 'flex';
+    backBtn.style.display = savedAccounts.length > 0 ? 'inline-flex' : 'none';
+  }
+}
+
+function initGoogleIdentityServices() {
+  const clientId = (localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || '').trim();
+  const gsiWrapper = document.getElementById('googleGsiWrapper');
+  const gsiContainer = document.getElementById('googleGsiButtonContainer');
+  const clientIdInput = document.getElementById('googleClientIdInput');
+  if (clientIdInput && clientId) {
+    clientIdInput.value = clientId;
+  }
+
+  if (!clientId || !gsiWrapper || !gsiContainer) {
+    if (gsiWrapper) gsiWrapper.style.display = 'none';
+    return;
+  }
+
+  const tryRenderGsi = () => {
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          const payload = decodeGoogleJwt(response.credential);
+          if (payload && payload.email) {
+            completeUserLogin({
+              name: payload.name || payload.given_name || payload.email.split('@')[0],
+              email: payload.email,
+              picture: payload.picture || ''
+            });
+          }
+        }
+      });
+      gsiWrapper.style.display = 'flex';
+      gsiContainer.innerHTML = '';
+      window.google.accounts.id.renderButton(gsiContainer, {
+        theme: 'filled_black',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: 340
+      });
+    } else {
+      setTimeout(tryRenderGsi, 400);
+    }
+  };
+
+  tryRenderGsi();
+}
+
+function initAuthFlow() {
+  renderSidebarUserCard();
+  initGoogleIdentityServices();
+
+  if (currentUser && currentUser.email) {
+    const overlay = document.getElementById('authOverlay');
+    if (overlay) {
+      overlay.classList.add('is-hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+  } else {
+    showAuthOverlay(false);
+  }
+}
+
+// ============================================================================
 // EVENT LISTENERS
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
   initPresetsAndPickers();
+  initAuthFlow();
   renderAll();
-  initSQLiteDatabase();
+  if (currentUser && currentUser.email) {
+    initSQLiteDatabase();
+  }
+
+  // Auth & Account Switcher Events
+  const googleLoginForm = document.getElementById('googleLoginForm');
+  if (googleLoginForm) {
+    googleLoginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('authNameInput').value.trim();
+      const email = document.getElementById('authEmailInput').value.trim().toLowerCase();
+      const pin = document.getElementById('authPinInput').value;
+      const errEl = document.getElementById('authErrorMsg');
+
+      if (!name || !email || !email.includes('@')) {
+        errEl.textContent = 'Preencha seu nome e um e-mail Google válido.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const existing = getSavedAccounts().find((a) => a.email.toLowerCase() === email);
+      if (existing && existing.pinHash && existing.pinHash !== pin) {
+        errEl.textContent = 'Senha / PIN incorreto para esta conta.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+      googleLoginForm.reset();
+      completeUserLogin({
+        name,
+        email,
+        picture: existing ? existing.picture || '' : '',
+        pinHash: pin || (existing ? existing.pinHash || '' : '')
+      });
+    });
+  }
+
+  const savedAccountsList = document.getElementById('savedAccountsList');
+  if (savedAccountsList) {
+    savedAccountsList.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-account]');
+      if (removeBtn) {
+        e.stopPropagation();
+        const emailToRemove = removeBtn.getAttribute('data-remove-account');
+        const updated = getSavedAccounts().filter((a) => a.email.toLowerCase() !== emailToRemove.toLowerCase());
+        localStorage.setItem(AUTH_SAVED_ACCOUNTS_KEY, JSON.stringify(updated));
+        showAuthOverlay(false);
+        return;
+      }
+
+      const item = e.target.closest('[data-login-email]');
+      if (!item) return;
+      const email = item.getAttribute('data-login-email');
+      const acc = getSavedAccounts().find((a) => a.email.toLowerCase() === email.toLowerCase());
+      if (!acc) return;
+
+      if (acc.pinHash) {
+        const enteredPin = prompt(`Digite a senha / PIN da conta de ${acc.name} (${acc.email}):`);
+        if (enteredPin === null) return;
+        if (enteredPin !== acc.pinHash) {
+          alert('Senha / PIN incorreto.');
+          return;
+        }
+      }
+
+      completeUserLogin(acc);
+    });
+  }
+
+  const useAnotherBtn = document.getElementById('useAnotherAccountBtn');
+  if (useAnotherBtn) {
+    useAnotherBtn.addEventListener('click', () => showAuthOverlay(true));
+  }
+
+  const backToSavedBtn = document.getElementById('backToSavedAccountsBtn');
+  if (backToSavedBtn) {
+    backToSavedBtn.addEventListener('click', () => showAuthOverlay(false));
+  }
+
+  const logoutBtn = document.getElementById('logoutUserBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => logoutUser());
+  }
+
+  const toggleOauthBtn = document.getElementById('toggleOauthConfigBtn');
+  if (toggleOauthBtn) {
+    toggleOauthBtn.addEventListener('click', () => {
+      const box = document.getElementById('oauthConfigBox');
+      if (box) box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+    });
+  }
+
+  const saveClientIdBtn = document.getElementById('saveGoogleClientIdBtn');
+  if (saveClientIdBtn) {
+    saveClientIdBtn.addEventListener('click', () => {
+      const val = (document.getElementById('googleClientIdInput').value || '').trim();
+      localStorage.setItem(GOOGLE_CLIENT_ID_KEY, val);
+      initGoogleIdentityServices();
+      alert(val ? 'Google Client ID salvo! O botão oficial do Google foi ativado.' : 'Google Client ID removido.');
+    });
+  }
 
   // Left Sidebar Tabs
   document.querySelectorAll('.nav-tab').forEach((btn) => {

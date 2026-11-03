@@ -71,12 +71,52 @@ db.exec(`
     fixada_todos_meses INTEGER NOT NULL DEFAULT 0,
     criado_em TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS usuarios_estado (
+    email TEXT PRIMARY KEY,
+    nome TEXT,
+    foto TEXT,
+    estado_json TEXT NOT NULL,
+    atualizado_em TEXT NOT NULL
+  );
 `);
 
 /**
- * Lê todo o estado estruturado diretamente das tabelas SQLite
+ * Lê todo o estado estruturado diretamente das tabelas SQLite (por conta de usuário ou global)
  */
-function readStateFromSQLite() {
+function readStateFromSQLite(userEmail = '') {
+  const cleanEmail = String(userEmail || '').trim().toLowerCase();
+  if (cleanEmail) {
+    const userRow = db.prepare(`SELECT estado_json FROM usuarios_estado WHERE email = ?`).get(cleanEmail);
+    if (!userRow) {
+      return {
+        isEmptyDatabase: true,
+        state: {
+          defaultSalary: 0,
+          fixedExpenses: [],
+          pinnedObservations: [],
+          months: {}
+        }
+      };
+    }
+    try {
+      const parsed = JSON.parse(userRow.estado_json || '{}');
+      return {
+        isEmptyDatabase: false,
+        state: {
+          defaultSalary: Number(parsed.defaultSalary) || 0,
+          fixedExpenses: Array.isArray(parsed.fixedExpenses) ? parsed.fixedExpenses : [],
+          pinnedObservations: Array.isArray(parsed.pinnedObservations) ? parsed.pinnedObservations : [],
+          months: parsed.months && typeof parsed.months === 'object' ? parsed.months : {}
+        }
+      };
+    } catch {
+      return {
+        isEmptyDatabase: true,
+        state: { defaultSalary: 0, fixedExpenses: [], pinnedObservations: [], months: {} }
+      };
+    }
+  }
   const configRow = db.prepare(`SELECT valor FROM configuracoes WHERE chave = 'defaultSalary'`).get();
   const hasInitializedRow = db.prepare(`SELECT valor FROM configuracoes WHERE chave = 'initialized'`).get();
 
@@ -182,11 +222,31 @@ function readStateFromSQLite() {
 /**
  * Grava todo o estado de forma transacional no banco SQLite + espelho JSON
  */
-function writeStateToSQLite(newState) {
+function writeStateToSQLite(newState, userMeta = {}) {
   const nowISO = new Date().toISOString();
+  const cleanEmail = String(userMeta.userEmail || '').trim().toLowerCase();
 
   db.exec('BEGIN IMMEDIATE TRANSACTION');
   try {
+    if (cleanEmail) {
+      const upsertUser = db.prepare(`
+        INSERT INTO usuarios_estado (email, nome, foto, estado_json, atualizado_em)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(email) DO UPDATE SET
+          nome = excluded.nome,
+          foto = excluded.foto,
+          estado_json = excluded.estado_json,
+          atualizado_em = excluded.atualizado_em
+      `);
+      upsertUser.run(
+        cleanEmail,
+        String(userMeta.userName || ''),
+        String(userMeta.userPicture || ''),
+        JSON.stringify(newState || {}),
+        nowISO
+      );
+    }
+
     const upsertConfig = db.prepare(`
       INSERT INTO configuracoes (chave, valor, atualizado_em)
       VALUES (?, ?, ?)
@@ -373,7 +433,8 @@ const server = http.createServer((req, res) => {
   // API: Ler Estado Completo do Banco SQLite
   if (pathname === '/api/state' && req.method === 'GET') {
     try {
-      const payload = readStateFromSQLite();
+      const userParam = parsedUrl.searchParams.get('user') || '';
+      const payload = readStateFromSQLite(userParam);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, ...payload, stats: getDatabaseStats() }));
     } catch (err) {
@@ -393,7 +454,11 @@ const server = http.createServer((req, res) => {
       try {
         const parsed = JSON.parse(body);
         const stateToSave = parsed.state || parsed;
-        const stats = writeStateToSQLite(stateToSave);
+        const stats = writeStateToSQLite(stateToSave, {
+          userEmail: parsed.userEmail || '',
+          userName: parsed.userName || '',
+          userPicture: parsed.userPicture || ''
+        });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, stats }));
       } catch (err) {
