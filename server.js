@@ -86,10 +86,15 @@ db.exec(`
     email TEXT PRIMARY KEY,
     nome TEXT,
     foto TEXT,
+    senha TEXT,
     estado_json TEXT NOT NULL,
     atualizado_em TEXT NOT NULL
   );
 `);
+
+try {
+  db.exec(`ALTER TABLE usuarios_estado ADD COLUMN senha TEXT;`);
+} catch {}
 
 /**
  * Lê todo o estado estruturado diretamente das tabelas SQLite (por conta de usuário ou global)
@@ -264,12 +269,18 @@ function writeStateToSQLite(newState, userMeta = {}) {
   db.exec('BEGIN IMMEDIATE TRANSACTION');
   try {
     if (cleanEmail) {
+      const existingUser = db.prepare(`SELECT senha FROM usuarios_estado WHERE email = ?`).get(cleanEmail);
+      const pinToSave = userMeta.userPinHash !== undefined && userMeta.userPinHash !== ''
+        ? String(userMeta.userPinHash)
+        : (existingUser && existingUser.senha ? existingUser.senha : '');
+
       const upsertUser = db.prepare(`
-        INSERT INTO usuarios_estado (email, nome, foto, estado_json, atualizado_em)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO usuarios_estado (email, nome, foto, senha, estado_json, atualizado_em)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(email) DO UPDATE SET
           nome = excluded.nome,
           foto = excluded.foto,
+          senha = excluded.senha,
           estado_json = excluded.estado_json,
           atualizado_em = excluded.atualizado_em
       `);
@@ -277,6 +288,7 @@ function writeStateToSQLite(newState, userMeta = {}) {
         cleanEmail,
         String(userMeta.userName || ''),
         String(userMeta.userPicture || ''),
+        pinToSave,
         JSON.stringify(newState || {}),
         nowISO
       );
@@ -521,14 +533,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API: Listar contas Google salvas no banco SQLite
+  // API: Listar contas salvas no banco SQLite
   if (pathname === '/api/users' && req.method === 'GET') {
     try {
-      const rows = db.prepare(`SELECT email, nome, foto, atualizado_em FROM usuarios_estado ORDER BY atualizado_em DESC`).all();
+      const rows = db.prepare(`SELECT email, nome, foto, senha, atualizado_em FROM usuarios_estado ORDER BY atualizado_em DESC`).all();
       const users = rows.map((r) => ({
         email: r.email,
         name: r.nome || r.email.split('@')[0],
         picture: r.foto || '',
+        pinHash: r.senha || '',
         lastLoginAt: r.atualizado_em
       }));
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -567,7 +580,8 @@ const server = http.createServer((req, res) => {
         const stats = writeStateToSQLite(stateToSave, {
           userEmail: parsed.userEmail || '',
           userName: parsed.userName || '',
-          userPicture: parsed.userPicture || ''
+          userPicture: parsed.userPicture || '',
+          userPinHash: parsed.userPinHash || ''
         });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, stats }));
@@ -601,7 +615,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log('====================================================');
-  console.log(' MEU CAIXA — BANCO DE DADOS SQLITE ATIVO');
+  console.log(' SOBROU ALGO — BANCO DE DADOS SQLITE ATIVO');
   console.log(` Banco SQLite: ${DB_PATH}`);
   console.log(` Acesse no navegador: http://localhost:${PORT}`);
   console.log('====================================================');
