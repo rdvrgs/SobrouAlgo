@@ -483,6 +483,63 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: Configurar / Ler Google OAuth Client ID salvo no SQLite
+  if (pathname === '/api/oauth-config' && req.method === 'GET') {
+    try {
+      const row = db.prepare(`SELECT valor FROM configuracoes WHERE chave = 'googleClientId'`).get();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, googleClientId: row ? row.valor : '' }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/oauth-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const clientId = String(parsed.googleClientId || '').trim();
+        const nowISO = new Date().toISOString();
+        db.prepare(`
+          INSERT INTO configuracoes (chave, valor, atualizado_em)
+          VALUES ('googleClientId', ?, ?)
+          ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor, atualizado_em = excluded.atualizado_em
+        `).run(clientId, nowISO);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, googleClientId: clientId }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Listar contas Google salvas no banco SQLite
+  if (pathname === '/api/users' && req.method === 'GET') {
+    try {
+      const rows = db.prepare(`SELECT email, nome, foto, atualizado_em FROM usuarios_estado ORDER BY atualizado_em DESC`).all();
+      const users = rows.map((r) => ({
+        email: r.email,
+        name: r.nome || r.email.split('@')[0],
+        picture: r.foto || '',
+        lastLoginAt: r.atualizado_em
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, users }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+    return;
+  }
+
   // API: Ler Estado Completo do Banco SQLite
   if (pathname === '/api/state' && req.method === 'GET') {
     try {

@@ -1606,19 +1606,24 @@ function renderSidebarUserCard() {
   nameEl.textContent = currentUser.name || 'Usuário';
   emailEl.textContent = currentUser.email || '';
 
+  const initial = (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase();
   if (currentUser.picture) {
-    avatarEl.innerHTML = `<img src="${escapeHTML(currentUser.picture)}" alt="${escapeHTML(currentUser.name)}" referrerpolicy="no-referrer" />`;
+    avatarEl.innerHTML = `<img src="${escapeHTML(currentUser.picture)}" alt="${escapeHTML(currentUser.name)}" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.textContent='${escapeHTML(initial)}';" />`;
   } else {
-    const initial = (currentUser.name || currentUser.email || 'U').trim().charAt(0).toUpperCase();
     avatarEl.innerHTML = escapeHTML(initial);
   }
 }
 
 async function completeUserLogin(account) {
+  const cleanEmail = String(account.email || '').trim().toLowerCase();
+  const fallbackName = cleanEmail.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+  const cleanName = String(account.name || '').trim() || fallbackName || 'Usuário';
+  const cleanPic = account.picture || `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}`;
+
   const cleanUser = {
-    name: String(account.name || '').trim() || account.email.split('@')[0],
-    email: String(account.email || '').trim().toLowerCase(),
-    picture: account.picture || ''
+    name: cleanName,
+    email: cleanEmail,
+    picture: cleanPic
   };
 
   currentUser = cleanUser;
@@ -1640,6 +1645,7 @@ async function completeUserLogin(account) {
   renderSidebarUserCard();
   renderAll();
   await initSQLiteDatabase();
+  await syncStateToSQLite();
 }
 
 function logoutUser() {
@@ -1658,6 +1664,11 @@ function showAuthOverlay(forceForm = false) {
   const errEl = document.getElementById('authErrorMsg');
   if (errEl) errEl.style.display = 'none';
 
+  const originDisplay = document.getElementById('currentOriginDisplay');
+  if (originDisplay && window.location.origin && window.location.origin !== 'null') {
+    originDisplay.textContent = window.location.origin;
+  }
+
   const savedAccounts = getSavedAccounts();
   const savedSection = document.getElementById('savedAccountsSection');
   const savedList = document.getElementById('savedAccountsList');
@@ -1672,9 +1683,8 @@ function showAuthOverlay(forceForm = false) {
     savedList.innerHTML = savedAccounts
       .map((acc) => {
         const initial = (acc.name || acc.email || 'G').trim().charAt(0).toUpperCase();
-        const avatarHTML = acc.picture
-          ? `<img src="${escapeHTML(acc.picture)}" alt="" referrerpolicy="no-referrer" />`
-          : escapeHTML(initial);
+        const picUrl = acc.picture || `https://unavatar.io/google/${encodeURIComponent(acc.email)}`;
+        const avatarHTML = `<img src="${escapeHTML(picUrl)}" alt="" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.textContent='${escapeHTML(initial)}';" />`;
 
         return `
           <div class="saved-account-item" data-login-email="${escapeHTML(acc.email)}">
@@ -1699,6 +1709,8 @@ function showAuthOverlay(forceForm = false) {
   }
 }
 
+let googleOAuthTokenClient = null;
+
 function initGoogleIdentityServices() {
   const clientId = (localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || '').trim();
   const gsiWrapper = document.getElementById('googleGsiWrapper');
@@ -1708,46 +1720,186 @@ function initGoogleIdentityServices() {
     clientIdInput.value = clientId;
   }
 
-  if (!clientId || !gsiWrapper || !gsiContainer) {
+  if (!clientId) {
     if (gsiWrapper) gsiWrapper.style.display = 'none';
+    googleOAuthTokenClient = null;
     return;
   }
 
-  const tryRenderGsi = () => {
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response) => {
-          const payload = decodeGoogleJwt(response.credential);
-          if (payload && payload.email) {
-            completeUserLogin({
-              name: payload.name || payload.given_name || payload.email.split('@')[0],
-              email: payload.email,
-              picture: payload.picture || ''
-            });
+  const tryInitGoogleApi = () => {
+    if (window.google && window.google.accounts) {
+      // 1. Inicializa OAuth 2.0 Token Client (Pop-up Oficial Google UserInfo API)
+      if (window.google.accounts.oauth2) {
+        googleOAuthTokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'openid email profile',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              try {
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                });
+                const profile = await res.json();
+                if (profile && profile.email) {
+                  await completeUserLogin({
+                    name: profile.name || profile.given_name || profile.email.split('@')[0],
+                    email: profile.email,
+                    picture: profile.picture || ''
+                  });
+                }
+              } catch (err) {
+                const errEl = document.getElementById('authErrorMsg');
+                if (errEl) {
+                  errEl.textContent = 'Erro ao buscar perfil na API do Google. Tente novamente.';
+                  errEl.style.display = 'block';
+                }
+              }
+            }
           }
-        }
-      });
-      gsiWrapper.style.display = 'flex';
-      gsiContainer.innerHTML = '';
-      window.google.accounts.id.renderButton(gsiContainer, {
-        theme: 'filled_black',
-        size: 'large',
-        shape: 'pill',
-        text: 'continue_with',
-        width: 340
-      });
+        });
+      }
+
+      // 2. Inicializa Google Identity Services Button (JWT One-Tap / Sign-In)
+      if (window.google.accounts.id && gsiWrapper && gsiContainer) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response) => {
+            const payload = decodeGoogleJwt(response.credential);
+            if (payload && payload.email) {
+              completeUserLogin({
+                name: payload.name || payload.given_name || payload.email.split('@')[0],
+                email: payload.email,
+                picture: payload.picture || ''
+              });
+            }
+          }
+        });
+        gsiWrapper.style.display = 'flex';
+        gsiContainer.innerHTML = '';
+        window.google.accounts.id.renderButton(gsiContainer, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          width: 340
+        });
+      }
     } else {
-      setTimeout(tryRenderGsi, 400);
+      setTimeout(tryInitGoogleApi, 400);
     }
   };
 
-  tryRenderGsi();
+  tryInitGoogleApi();
+}
+
+function triggerGoogleOAuthPopup() {
+  // Se estiver aberto via file://, redireciona para http://localhost:3333 pois a API do Google bloqueia file://
+  if (window.location.protocol === 'file:') {
+    window.location.href = `${API_BASE}/`;
+    return;
+  }
+
+  const clientId = (localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || '').trim();
+
+  // Se o Client ID OAuth 2.0 do Google está configurado, abre a janela pop-up oficial da API do Google!
+  if (clientId && googleOAuthTokenClient) {
+    googleOAuthTokenClient.requestAccessToken({ prompt: 'select_account' });
+    return;
+  }
+
+  if (clientId && window.google && window.google.accounts && window.google.accounts.oauth2) {
+    initGoogleIdentityServices();
+    if (googleOAuthTokenClient) {
+      googleOAuthTokenClient.requestAccessToken({ prompt: 'select_account' });
+      return;
+    }
+  }
+
+  // Se o usuário já preencheu o e-mail no campo abaixo e clicou no botão do Google, autentica direto
+  const emailInput = document.getElementById('authEmailInput');
+  const nameInput = document.getElementById('authNameInput');
+  const pinInput = document.getElementById('authPinInput');
+  const emailVal = emailInput ? emailInput.value.trim().toLowerCase() : '';
+
+  if (emailVal && emailVal.includes('@')) {
+    const existing = getSavedAccounts().find((a) => a.email.toLowerCase() === emailVal);
+    const pinVal = pinInput ? pinInput.value : '';
+    const errEl = document.getElementById('authErrorMsg');
+
+    if (existing && existing.pinHash && existing.pinHash !== pinVal) {
+      if (errEl) {
+        errEl.textContent = 'Senha / PIN incorreto para esta conta.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+
+    completeUserLogin({
+      name: (nameInput ? nameInput.value.trim() : '') || (existing ? existing.name : ''),
+      email: emailVal,
+      picture: existing ? existing.picture || '' : '',
+      pinHash: pinVal || (existing ? existing.pinHash || '' : '')
+    });
+    return;
+  }
+
+  // Caso ainda não tenha Client ID nem e-mail digitado, foca no Gmail e abre o painel de vínculo da API OAuth
+  const box = document.getElementById('oauthConfigBox');
+  if (box) box.style.display = 'flex';
+  const errEl = document.getElementById('authErrorMsg');
+  if (errEl) {
+    errEl.style.color = 'var(--cyan)';
+    errEl.style.borderColor = 'rgba(34, 211, 238, 0.35)';
+    errEl.style.background = 'rgba(34, 211, 238, 0.08)';
+    errEl.textContent = 'Digite seu Gmail abaixo para entrar agora, ou cole seu Client ID OAuth abaixo para ativar o pop-up oficial do Google Cloud.';
+    errEl.style.display = 'block';
+  }
+  if (emailInput) emailInput.focus();
+}
+
+async function syncAuthConfigWithServer() {
+  if (!IS_LOCAL_ENV) return;
+  try {
+    // 1. Busca Client ID salvo no SQLite
+    const cfgRes = await fetch(`${API_BASE}/api/oauth-config`);
+    if (cfgRes.ok) {
+      const cfgData = await cfgRes.json();
+      if (cfgData && cfgData.googleClientId && !localStorage.getItem(GOOGLE_CLIENT_ID_KEY)) {
+        localStorage.setItem(GOOGLE_CLIENT_ID_KEY, cfgData.googleClientId);
+        initGoogleIdentityServices();
+      }
+    }
+
+    // 2. Busca contas Google já salvas no banco SQLite (usuarios_estado)
+    const usersRes = await fetch(`${API_BASE}/api/users`);
+    if (usersRes.ok) {
+      const usersData = await usersRes.json();
+      if (usersData && Array.isArray(usersData.users) && usersData.users.length > 0) {
+        const localList = getSavedAccounts();
+        for (const u of usersData.users) {
+          if (!localList.some((a) => a.email.toLowerCase() === u.email.toLowerCase())) {
+            localList.push({
+              name: u.name || u.email.split('@')[0],
+              email: u.email.toLowerCase(),
+              picture: u.picture || `https://unavatar.io/google/${encodeURIComponent(u.email)}`,
+              pinHash: '',
+              lastLoginAt: u.lastLoginAt || new Date().toISOString()
+            });
+          }
+        }
+        localStorage.setItem(AUTH_SAVED_ACCOUNTS_KEY, JSON.stringify(localList));
+        if (!currentUser) {
+          showAuthOverlay(false);
+        }
+      }
+    }
+  } catch {}
 }
 
 function initAuthFlow() {
   renderSidebarUserCard();
   initGoogleIdentityServices();
+  syncAuthConfigWithServer();
 
   if (currentUser && currentUser.email) {
     const overlay = document.getElementById('authOverlay');
@@ -1771,6 +1923,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initSQLiteDatabase();
   }
 
+  // Botão Oficial "Fazer login com o Google" (OAuth 2.0 Popup / Login Direto)
+  const btnGooglePopup = document.getElementById('btnGoogleOAuthPopup');
+  if (btnGooglePopup) {
+    btnGooglePopup.addEventListener('click', () => triggerGoogleOAuthPopup());
+  }
+
   // Auth & Account Switcher Events
   const googleLoginForm = document.getElementById('googleLoginForm');
   if (googleLoginForm) {
@@ -1781,14 +1939,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const pin = document.getElementById('authPinInput').value;
       const errEl = document.getElementById('authErrorMsg');
 
-      if (!name || !email || !email.includes('@')) {
-        errEl.textContent = 'Preencha seu nome e um e-mail Google válido.';
+      if (!email || !email.includes('@')) {
+        errEl.style.color = '';
+        errEl.style.borderColor = '';
+        errEl.style.background = '';
+        errEl.textContent = 'Preencha um e-mail do Google (Gmail) válido.';
         errEl.style.display = 'block';
         return;
       }
 
       const existing = getSavedAccounts().find((a) => a.email.toLowerCase() === email);
       if (existing && existing.pinHash && existing.pinHash !== pin) {
+        errEl.style.color = '';
+        errEl.style.borderColor = '';
+        errEl.style.background = '';
         errEl.textContent = 'Senha / PIN incorreto para esta conta.';
         errEl.style.display = 'block';
         return;
@@ -1797,7 +1961,7 @@ document.addEventListener('DOMContentLoaded', () => {
       errEl.style.display = 'none';
       googleLoginForm.reset();
       completeUserLogin({
-        name,
+        name: name || (existing ? existing.name : ''),
         email,
         picture: existing ? existing.picture || '' : '',
         pinHash: pin || (existing ? existing.pinHash || '' : '')
@@ -1862,11 +2026,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const saveClientIdBtn = document.getElementById('saveGoogleClientIdBtn');
   if (saveClientIdBtn) {
-    saveClientIdBtn.addEventListener('click', () => {
+    saveClientIdBtn.addEventListener('click', async () => {
       const val = (document.getElementById('googleClientIdInput').value || '').trim();
       localStorage.setItem(GOOGLE_CLIENT_ID_KEY, val);
+      if (IS_LOCAL_ENV) {
+        try {
+          await fetch(`${API_BASE}/api/oauth-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleClientId: val })
+          });
+        } catch {}
+      }
       initGoogleIdentityServices();
-      alert(val ? 'Google Client ID salvo! O botão oficial do Google foi ativado.' : 'Google Client ID removido.');
+      if (val) {
+        setTimeout(() => triggerGoogleOAuthPopup(), 300);
+      } else {
+        alert('Google Client ID removido.');
+      }
     });
   }
 
