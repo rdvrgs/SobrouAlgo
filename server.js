@@ -63,6 +63,16 @@ db.exec(`
     criado_em TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS entradas_mes (
+    id TEXT PRIMARY KEY,
+    mes_ano TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    valor REAL NOT NULL,
+    data_entrada TEXT NOT NULL,
+    observacao TEXT,
+    criado_em TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS observacoes (
     id TEXT PRIMARY KEY,
     mes_ano TEXT,
@@ -122,6 +132,7 @@ function readStateFromSQLite(userEmail = '') {
 
   const fixedRows = db.prepare(`SELECT * FROM gastos_fixos ORDER BY dia_vencimento ASC, criado_em ASC`).all();
   const monthRows = db.prepare(`SELECT * FROM meses_resumo`).all();
+  const incomeRows = db.prepare(`SELECT * FROM entradas_mes ORDER BY data_entrada ASC, criado_em ASC`).all();
   const varRows = db.prepare(`SELECT * FROM gastos_variaveis ORDER BY data_gasto DESC, criado_em DESC`).all();
   const obsRows = db.prepare(`SELECT * FROM observacoes ORDER BY criado_em DESC`).all();
 
@@ -148,6 +159,7 @@ function readStateFromSQLite(userEmail = '') {
       paidFixedIds = [];
     }
     months[m.mes_ano] = {
+      incomes: [],
       salaryOverride: m.salario_especifico !== null && m.salario_especifico !== undefined ? Number(m.salario_especifico) : null,
       extraIncome: Number(m.renda_extra) || 0,
       extraIncomeNote: m.observacao_renda || '',
@@ -158,9 +170,32 @@ function readStateFromSQLite(userEmail = '') {
     };
   }
 
+  for (const inc of incomeRows) {
+    if (!months[inc.mes_ano]) {
+      months[inc.mes_ano] = {
+        incomes: [],
+        salaryOverride: null,
+        extraIncome: 0,
+        extraIncomeNote: '',
+        paidFixedIds: [],
+        variableExpenses: [],
+        notepad: '',
+        observations: []
+      };
+    }
+    months[inc.mes_ano].incomes.push({
+      id: inc.id,
+      name: inc.nome,
+      amount: Number(inc.valor) || 0,
+      date: inc.data_entrada,
+      note: inc.observacao || ''
+    });
+  }
+
   for (const v of varRows) {
     if (!months[v.mes_ano]) {
       months[v.mes_ano] = {
+        incomes: [],
         salaryOverride: null,
         extraIncome: 0,
         extraIncomeNote: '',
@@ -279,14 +314,20 @@ function writeStateToSQLite(newState, userMeta = {}) {
       );
     }
 
-    // Atualiza meses_resumo, gastos_variaveis e observacoes
+    // Atualiza meses_resumo, entradas_mes, gastos_variaveis e observacoes
     db.exec('DELETE FROM meses_resumo');
+    db.exec('DELETE FROM entradas_mes');
     db.exec('DELETE FROM gastos_variaveis');
     db.exec('DELETE FROM observacoes');
 
     const insertMonth = db.prepare(`
       INSERT INTO meses_resumo (mes_ano, salario_especifico, renda_extra, observacao_renda, bloco_notas, fixos_pagos_json)
       VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertIncome = db.prepare(`
+      INSERT INTO entradas_mes (id, mes_ano, nome, valor, data_entrada, observacao, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertVar = db.prepare(`
@@ -327,6 +368,18 @@ function writeStateToSQLite(newState, userMeta = {}) {
         String(bucket.notepad || ''),
         JSON.stringify(Array.isArray(bucket.paidFixedIds) ? bucket.paidFixedIds : [])
       );
+
+      for (const inc of bucket.incomes || []) {
+        insertIncome.run(
+          String(inc.id),
+          monthKey,
+          String(inc.name || ''),
+          Number(inc.amount) || 0,
+          String(inc.date || `${monthKey}-05`),
+          String(inc.note || ''),
+          nowISO
+        );
+      }
 
       for (const v of bucket.variableExpenses || []) {
         insertVar.run(

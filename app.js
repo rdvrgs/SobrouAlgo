@@ -701,6 +701,7 @@ function saveState() {
 function ensureMonthBucket(monthKey) {
   if (!state.months[monthKey]) {
     state.months[monthKey] = {
+      incomes: [],
       salaryOverride: null,
       extraIncome: 0,
       extraIncomeNote: '',
@@ -710,7 +711,31 @@ function ensureMonthBucket(monthKey) {
       observations: []
     };
   }
-  return state.months[monthKey];
+  const bucket = state.months[monthKey];
+  if (!Array.isArray(bucket.incomes)) {
+    bucket.incomes = [];
+    if (bucket.salaryOverride && Number(bucket.salaryOverride) > 0) {
+      bucket.incomes.push({
+        id: uid(),
+        name: 'Pagamento (Dia 5)',
+        amount: Number(bucket.salaryOverride),
+        date: `${monthKey}-05`,
+        note: ''
+      });
+      bucket.salaryOverride = null;
+    }
+    if (bucket.extraIncome && Number(bucket.extraIncome) > 0) {
+      bucket.incomes.push({
+        id: uid(),
+        name: bucket.extraIncomeNote || 'Renda Extra',
+        amount: Number(bucket.extraIncome),
+        date: `${monthKey}-20`,
+        note: bucket.extraIncomeNote || ''
+      });
+      bucket.extraIncome = 0;
+    }
+  }
+  return bucket;
 }
 
 // ============================================================================
@@ -718,13 +743,8 @@ function ensureMonthBucket(monthKey) {
 // ============================================================================
 function computeMonthMetrics(monthKey) {
   const bucket = ensureMonthBucket(monthKey);
-  const baseSalary =
-    bucket.salaryOverride !== null && bucket.salaryOverride !== undefined
-      ? Number(bucket.salaryOverride)
-      : Number(state.defaultSalary) || 0;
-
-  const extraIncome = Number(bucket.extraIncome) || 0;
-  const totalIncome = baseSalary + extraIncome;
+  const incomeList = bucket.incomes || [];
+  const totalIncome = incomeList.reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
 
   const activeFixed = state.fixedExpenses.filter((x) => x.active !== false);
   const totalFixed = activeFixed.reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
@@ -737,9 +757,7 @@ function computeMonthMetrics(monthKey) {
   const savingsPct = totalIncome > 0 ? (balance / totalIncome) * 100 : 0;
 
   return {
-    baseSalary,
-    extraIncome,
-    extraIncomeNote: bucket.extraIncomeNote || '',
+    incomesCount: incomeList.length,
     totalIncome,
     activeFixedCount: activeFixed.length,
     totalFixed,
@@ -810,7 +828,7 @@ function renderSidebarStatus(m) {
     balDot.style.boxShadow = '0 0 8px var(--emerald)';
     balFill.style.background = 'var(--emerald)';
     balFill.style.width = `${Math.min(100, Math.max(4, m.savingsPct))}%`;
-    balMeta.textContent = `${m.savingsPct.toFixed(0)}% do salário preservado`;
+    balMeta.textContent = `${m.savingsPct.toFixed(0)}% das entradas livre`;
   } else if (m.balance < 0) {
     balLabel.textContent = 'Faltou no Mês';
     balVal.style.color = 'var(--crimson)';
@@ -818,14 +836,14 @@ function renderSidebarStatus(m) {
     balDot.style.boxShadow = '0 0 8px var(--crimson)';
     balFill.style.background = 'var(--crimson)';
     balFill.style.width = '100%';
-    balMeta.textContent = 'Gastos superaram os ganhos';
+    balMeta.textContent = 'Gastos superaram as entradas';
   } else {
     balLabel.textContent = 'Saldo Restante';
     balVal.style.color = 'var(--text-primary)';
     balDot.style.background = 'var(--text-muted)';
     balDot.style.boxShadow = 'none';
     balFill.style.width = '0%';
-    balMeta.textContent = 'Preencha seu salário e gastos';
+    balMeta.textContent = 'Lance suas entradas e gastos';
   }
 }
 
@@ -842,8 +860,8 @@ function renderOverviewTab(m, monthLabel) {
 
   if (m.totalIncome === 0 && m.totalOut === 0) {
     if (statusText) statusText.textContent = 'AGUARDANDO DADOS';
-    headline.textContent = 'Configure seu salário para ver o balanço do mês';
-    subtext.textContent = 'Abra a aba "Salário & Renda" na esquerda para definir quanto você ganha por mês.';
+    headline.textContent = 'Registre suas entradas para ver o balanço do mês';
+    subtext.textContent = 'Abra a aba "Entradas do Mês" na esquerda para lançar o pagamento do dia 5, vale do dia 20 e outros valores.';
     balanceTitle.textContent = 'SALDO DO MÊS';
     balanceVal.textContent = formatBRL(0);
     balanceVal.style.color = 'var(--text-primary)';
@@ -851,15 +869,15 @@ function renderOverviewTab(m, monthLabel) {
     banner.classList.add('status-positive');
     if (statusText) statusText.textContent = 'NO AZUL · GANHOU MAIS DO QUE GASTOU';
     headline.textContent = `Você terminou ${monthLabel} com ${formatBRL(m.balance)} sobrando`;
-    subtext.textContent = `Dos ${formatBRL(m.totalIncome)} recebidos, saíram ${formatBRL(m.totalFixed)} em assinaturas/fixos e ${formatBRL(m.totalVariable)} em outros gastos.`;
+    subtext.textContent = `Dos ${formatBRL(m.totalIncome)} que entraram no mês, saíram ${formatBRL(m.totalFixed)} em assinaturas/fixos e ${formatBRL(m.totalVariable)} em outros gastos.`;
     balanceTitle.textContent = 'QUANTO SOBROU NO MÊS';
     balanceVal.textContent = formatBRL(m.balance);
     balanceVal.style.color = 'var(--emerald)';
   } else {
     banner.classList.add('status-negative');
-    if (statusText) statusText.textContent = 'NO VERMELHO · GASTOU ACIMA DO SALÁRIO';
-    headline.textContent = `Seus gastos passaram do salário em ${formatBRL(Math.abs(m.balance))}`;
-    subtext.textContent = `Você recebeu ${formatBRL(m.totalIncome)}, mas gastou ${formatBRL(m.totalOut)} no total (${formatBRL(m.totalFixed)} fixos + ${formatBRL(m.totalVariable)} variáveis).`;
+    if (statusText) statusText.textContent = 'NO VERMELHO · GASTOU ACIMA DAS ENTRADAS';
+    headline.textContent = `Seus gastos passaram das entradas em ${formatBRL(Math.abs(m.balance))}`;
+    subtext.textContent = `Entraram ${formatBRL(m.totalIncome)}, mas saíram ${formatBRL(m.totalOut)} no total (${formatBRL(m.totalFixed)} fixos + ${formatBRL(m.totalVariable)} variáveis).`;
     balanceTitle.textContent = 'QUANTO FALTOU (DÉFICIT)';
     balanceVal.textContent = `- ${formatBRL(Math.abs(m.balance))}`;
     balanceVal.style.color = 'var(--crimson)';
@@ -914,23 +932,27 @@ function renderOverviewTab(m, monthLabel) {
 
   // 3 Summary Tiles
   document.getElementById('kpiSalaryValue').textContent = formatBRL(m.totalIncome);
+  const incCountBadge = document.getElementById('kpiIncomeCountBadge');
+  if (incCountBadge) {
+    incCountBadge.textContent = `${m.incomesCount} ${m.incomesCount === 1 ? 'entrada' : 'entradas'} →`;
+  }
   document.getElementById('kpiSalaryMeta').textContent =
-    m.extraIncome > 0
-      ? `Base ${formatBRL(m.baseSalary)} + Extra ${formatBRL(m.extraIncome)}`
-      : 'Clique para configurar salário e renda';
+    m.incomesCount > 0
+      ? `${m.incomesCount} ${m.incomesCount === 1 ? 'entrada lançada' : 'entradas lançadas'} neste mês`
+      : 'Clique para lançar entradas (Dia 5, Vale Dia 20...)';
 
   document.getElementById('kpiFixedValue').textContent = formatBRL(m.totalFixed);
   document.getElementById('kpiFixedCountBadge').textContent = `${m.activeFixedCount} ativos →`;
   document.getElementById('kpiFixedMeta').textContent =
     m.totalIncome > 0
-      ? `Compromete ${((m.totalFixed / m.totalIncome) * 100).toFixed(1)}% do salário`
+      ? `Compromete ${((m.totalFixed / m.totalIncome) * 100).toFixed(1)}% das entradas`
       : 'Assinaturas descontadas todo mês';
 
   document.getElementById('kpiVariableValue').textContent = formatBRL(m.totalVariable);
   document.getElementById('kpiVariableCountBadge').textContent = `${m.variableCount} itens →`;
   document.getElementById('kpiVariableMeta').textContent =
     m.totalIncome > 0
-      ? `Consome ${((m.totalVariable / m.totalIncome) * 100).toFixed(1)}% do salário`
+      ? `Consome ${((m.totalVariable / m.totalIncome) * 100).toFixed(1)}% das entradas`
       : 'Gastos não fixos deste mês';
 
   // Fixed Subscriptions Preview Grid with Real Brand Logos
@@ -994,26 +1016,69 @@ function renderOverviewTab(m, monthLabel) {
 
 function renderSalaryTab(m) {
   const bucket = ensureMonthBucket(currentMonthKey);
-  const salInput = document.getElementById('inlineSalaryInput');
-  const extInput = document.getElementById('inlineExtraInput');
-  const extNote = document.getElementById('inlineExtraNoteInput');
-  const defCheck = document.getElementById('inlineSalaryDefaultCheck');
+  const panelTotalEl = document.getElementById('panelIncomeTotal');
+  if (panelTotalEl) panelTotalEl.textContent = formatBRL(m.totalIncome);
 
-  if (document.activeElement !== salInput && document.activeElement !== extInput && document.activeElement !== extNote) {
-    salInput.value = m.baseSalary > 0 ? m.baseSalary : '';
-    extInput.value = m.extraIncome > 0 ? m.extraIncome : '';
-    extNote.value = m.extraIncomeNote || '';
-    defCheck.checked = bucket.salaryOverride === null;
+  const dateInput = document.getElementById('incomeDateInput');
+  const entryIdInput = document.getElementById('incomeEntryId');
+  if (dateInput && !dateInput.value && (!entryIdInput || !entryIdInput.value)) {
+    dateInput.value = `${currentMonthKey}-05`;
   }
 
-  document.getElementById('ledgerBaseSalary').textContent = `+ ${formatBRL(m.baseSalary)}`;
-  const extraRow = document.getElementById('ledgerExtraRow');
-  if (m.extraIncome > 0) {
-    extraRow.style.display = 'flex';
-    document.getElementById('ledgerExtraIncome').textContent = `+ ${formatBRL(m.extraIncome)}`;
-  } else {
-    extraRow.style.display = 'none';
+  // Render list of incomes in the month
+  const listEl = document.getElementById('incomeEntriesList');
+  const sortedIncomes = [...(bucket.incomes || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  if (listEl) {
+    if (sortedIncomes.length === 0) {
+      listEl.innerHTML = `<div class="empty-state">Nenhuma entrada lançada neste mês. Use os botões acima (ex: Pagamento Dia 5 ou Vale Dia 20) para registrar quanto entrou!</div>`;
+    } else {
+      listEl.innerHTML = sortedIncomes
+        .map(
+          (item) => `
+          <div class="expense-item">
+            <div class="expense-left">
+              <div class="brand-logo-box" style="width:40px;height:40px;background:rgba(16, 185, 129, 0.16);color:#10b981;border-color:#10b98133;" title="Entrada">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div class="expense-info">
+                <div class="expense-title-line">
+                  <span class="expense-name">${escapeHTML(item.name)}</span>
+                  <span class="tag-pill tag-pill-paid">Entrada</span>
+                </div>
+                <div class="expense-subline">
+                  <span class="mono">${formatDateBR(item.date)}</span>
+                  ${
+                    item.note
+                      ? `<span class="expense-note-chip">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          ${escapeHTML(item.note)}
+                        </span>`
+                      : ''
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="expense-right">
+              <span class="expense-amount mono text-emerald">+ ${formatBRL(item.amount)}</span>
+              <div class="expense-actions">
+                <button type="button" class="icon-btn" data-action="edit-income" data-id="${item.id}" title="Editar entrada">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </button>
+                <button type="button" class="icon-btn action-btn-danger" data-action="delete-income" data-id="${item.id}" title="Excluir entrada">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        `
+        )
+        .join('');
+    }
   }
+
+  document.getElementById('ledgerBaseSalary').textContent = `+ ${formatBRL(m.totalIncome)}`;
   document.getElementById('ledgerFixedOut').textContent = `- ${formatBRL(m.totalFixed)}`;
   document.getElementById('ledgerVariableOut').textContent = `- ${formatBRL(m.totalVariable)}`;
 
@@ -1344,7 +1409,7 @@ function renderAnnualTab() {
             </span>
           </div>
           <div class="amc-rows">
-            <div class="amc-row"><span>Salário/Renda:</span><strong class="mono text-emerald">${formatBRL(metrics.totalIncome)}</strong></div>
+            <div class="amc-row"><span>Entradas:</span><strong class="mono text-emerald">${formatBRL(metrics.totalIncome)}</strong></div>
             <div class="amc-row"><span>Gastos Fixos:</span><strong class="mono text-violet">${formatBRL(metrics.totalFixed)}</strong></div>
             <div class="amc-row"><span>Não Fixos:</span><strong class="mono text-amber">${formatBRL(metrics.totalVariable)}</strong></div>
           </div>
@@ -1928,37 +1993,103 @@ document.addEventListener('DOMContentLoaded', () => {
     highlightModalPicker('variableModalIconPicker', detected.key);
   });
 
-  // Salary Tab Quick Buttons & Form
-  document.querySelectorAll('[data-set-salary]').forEach((btn) => {
+  // Entradas do Mês (Dia 5, Vale Dia 20, Extras) Quick Presets & Form
+  function resetIncomeForm() {
+    const form = document.getElementById('addIncomeForm');
+    if (!form) return;
+    form.reset();
+    document.getElementById('incomeEntryId').value = '';
+    document.getElementById('incomeFormTitle').textContent = 'Lançar Entrada no Mês';
+    document.getElementById('incomeSubmitBtnText').textContent = 'Adicionar Entrada';
+    document.getElementById('incomeCancelEditBtn').style.display = 'none';
+    document.getElementById('incomeDateInput').value = `${currentMonthKey}-05`;
+  }
+
+  document.querySelectorAll('[data-income-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.getElementById('inlineSalaryInput').value = btn.getAttribute('data-set-salary');
+      const presetName = btn.getAttribute('data-income-preset');
+      const presetDay = btn.getAttribute('data-preset-day');
+      document.getElementById('incomeNameInput').value = presetName;
+      if (presetDay === '05' || presetDay === '20') {
+        document.getElementById('incomeDateInput').value = `${currentMonthKey}-${presetDay}`;
+      } else {
+        const todayISO = getTodayISO();
+        document.getElementById('incomeDateInput').value = todayISO.startsWith(currentMonthKey)
+          ? todayISO
+          : `${currentMonthKey}-05`;
+      }
+      document.getElementById('incomeAmountInput').focus();
     });
   });
 
-  document.getElementById('inlineSalaryForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const sal = parseFloat(document.getElementById('inlineSalaryInput').value) || 0;
-    const isDef = document.getElementById('inlineSalaryDefaultCheck').checked;
-    const extra = parseFloat(document.getElementById('inlineExtraInput').value) || 0;
-    const note = document.getElementById('inlineExtraNoteInput').value.trim();
+  const cancelIncomeEditBtn = document.getElementById('incomeCancelEditBtn');
+  if (cancelIncomeEditBtn) {
+    cancelIncomeEditBtn.addEventListener('click', () => resetIncomeForm());
+  }
 
-    const bucket = ensureMonthBucket(currentMonthKey);
-    if (isDef) {
-      state.defaultSalary = sal;
-      bucket.salaryOverride = null;
-    } else {
-      bucket.salaryOverride = sal;
-    }
-    bucket.extraIncome = extra;
-    bucket.extraIncomeNote = note;
+  const addIncomeForm = document.getElementById('addIncomeForm');
+  if (addIncomeForm) {
+    addIncomeForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('incomeEntryId').value;
+      const name = document.getElementById('incomeNameInput').value.trim();
+      const amount = parseFloat(document.getElementById('incomeAmountInput').value) || 0;
+      const date = document.getElementById('incomeDateInput').value || `${currentMonthKey}-05`;
+      const note = document.getElementById('incomeNoteInput').value.trim();
 
-    saveState();
-    renderAll();
+      if (!name || amount <= 0) return;
 
-    const toast = document.getElementById('salarySavedFeedback');
-    toast.classList.add('is-visible');
-    setTimeout(() => toast.classList.remove('is-visible'), 2000);
-  });
+      const bucket = ensureMonthBucket(currentMonthKey);
+      if (id) {
+        const idx = bucket.incomes.findIndex((x) => x.id === id);
+        if (idx !== -1) {
+          bucket.incomes[idx] = { id, name, amount, date, note };
+        }
+      } else {
+        bucket.incomes.push({ id: uid(), name, amount, date, note });
+      }
+
+      resetIncomeForm();
+      saveState();
+      renderAll();
+
+      const toast = document.getElementById('salarySavedFeedback');
+      if (toast) {
+        toast.classList.add('is-visible');
+        setTimeout(() => toast.classList.remove('is-visible'), 2000);
+      }
+    });
+  }
+
+  const incomeListEl = document.getElementById('incomeEntriesList');
+  if (incomeListEl) {
+    incomeListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const id = btn.getAttribute('data-id');
+      const bucket = ensureMonthBucket(currentMonthKey);
+
+      if (action === 'edit-income') {
+        const item = (bucket.incomes || []).find((x) => x.id === id);
+        if (item) {
+          document.getElementById('incomeEntryId').value = item.id;
+          document.getElementById('incomeNameInput').value = item.name;
+          document.getElementById('incomeAmountInput').value = item.amount;
+          document.getElementById('incomeDateInput').value = item.date || `${currentMonthKey}-05`;
+          document.getElementById('incomeNoteInput').value = item.note || '';
+          document.getElementById('incomeFormTitle').textContent = 'Editar Entrada do Mês';
+          document.getElementById('incomeSubmitBtnText').textContent = 'Salvar Alteração';
+          document.getElementById('incomeCancelEditBtn').style.display = 'inline-flex';
+          document.getElementById('incomeAmountInput').focus();
+        }
+      } else if (action === 'delete-income') {
+        bucket.incomes = (bucket.incomes || []).filter((x) => x.id !== id);
+        saveState();
+        renderAll();
+      }
+    });
+  }
 
   document.getElementById('simGoalSlider').addEventListener('input', () => {
     updateSavingsSimulator(computeMonthMetrics(currentMonthKey), 'slider');

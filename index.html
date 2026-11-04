@@ -161,7 +161,7 @@
                 <rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>
               </svg>
             </span>
-            <span class="nav-tab-text">Salário & Renda</span>
+            <span class="nav-tab-text">Entradas do Mês</span>
             <span class="nav-tab-badge mono" id="navBadgeSalary">R$ 0</span>
           </button>
 
@@ -282,8 +282,8 @@
         <!-- Hero Verdict Card -->
         <div class="hero-verdict" id="verdictBanner">
           <div class="hero-verdict-main">
-            <h2 class="hero-verdict-title" id="verdictHeadline">Configure seu salário para ver quanto sobrou</h2>
-            <p class="hero-verdict-desc" id="verdictSubtext">Acompanhe seus ganhos, assinaturas fixas e gastos do dia a dia.</p>
+            <h2 class="hero-verdict-title" id="verdictHeadline">Registre suas entradas para ver quanto sobrou</h2>
+            <p class="hero-verdict-desc" id="verdictSubtext">Acompanhe suas entradas (dia 5, vale dia 20, extras), assinaturas fixas e gastos do dia a dia.</p>
 
             <!-- Allocation Bar inside Hero -->
             <div class="hero-allocation">
@@ -311,11 +311,11 @@
         <div class="overview-cards-row">
           <div class="summary-tile" data-jump-tab="salary">
             <div class="tile-top">
-              <span class="tile-tag tag-emerald">Salário & Renda</span>
-              <span class="tile-arrow">Abrir aba →</span>
+              <span class="tile-tag tag-emerald">Entradas do Mês</span>
+              <span class="tile-arrow" id="kpiIncomeCountBadge">0 entradas →</span>
             </div>
             <div class="tile-amount mono" id="kpiSalaryValue">R$ 0,00</div>
-            <div class="tile-foot" id="kpiSalaryMeta">Clique para editar seu salário</div>
+            <div class="tile-foot" id="kpiSalaryMeta">Clique para lançar entradas (Dia 5, Vale Dia 20...)</div>
           </div>
 
           <div class="summary-tile" data-jump-tab="fixed">
@@ -370,90 +370,109 @@
       </section>
 
       <!-- =========================================================
-           TAB 2: SALÁRIO & RENDA
+           TAB 2: ENTRADAS DO MÊS (DIA 5, VALE DIA 20, EXTRAS)
       ========================================================== -->
       <section class="tab-view" id="tab-salary">
         <header class="stage-header">
           <div>
-            <h1 class="stage-title">Salário & Renda de <span class="month-highlight">Novembro 2026</span></h1>
+            <h1 class="stage-title">Entradas de <span class="month-highlight">Novembro 2026</span></h1>
+          </div>
+          <div class="stage-actions">
+            <div class="header-stat-pill">
+              <span>Total de Entradas no Mês:</span>
+              <strong class="mono text-emerald" id="panelIncomeTotal">R$ 0,00</strong>
+            </div>
           </div>
         </header>
 
         <div class="salary-workspace">
-          <!-- Left: Interactive Form to edit Salary & Extra Income directly -->
-          <form id="inlineSalaryForm" class="surface-box salary-editor-box">
-            <div class="surface-head">
-              <div>
-                <h3 class="surface-title">Configurar Ganhos do Mês</h3>
-                <p class="surface-sub">Preencha quanto você recebe para calcular exatamente quanto sobra no fim do mês.</p>
-              </div>
-            </div>
-
-            <div class="salary-form-body">
-              <div class="field-block">
-                <label for="inlineSalaryInput">Salário Líquido Mensal (R$)</label>
-                <div class="big-currency-input">
-                  <span class="mono">R$</span>
-                  <input type="number" step="0.01" min="0" id="inlineSalaryInput" class="mono" placeholder="0,00" required />
-                </div>
-                <div class="quick-salary-chips">
-                  <span class="chip-hint">Valores rápidos:</span>
-                  <button type="button" class="quick-val-btn mono" data-set-salary="2500">R$ 2.500</button>
-                  <button type="button" class="quick-val-btn mono" data-set-salary="3500">R$ 3.500</button>
-                  <button type="button" class="quick-val-btn mono" data-set-salary="5000">R$ 5.000</button>
-                  <button type="button" class="quick-val-btn mono" data-set-salary="7500">R$ 7.500</button>
-                  <button type="button" class="quick-val-btn mono" data-set-salary="10000">R$ 10.000</button>
+          <!-- Left: Add Income Entry Form + List of Month's Incomes -->
+          <div class="salary-left-col" style="display: flex; flex-direction: column; gap: 18px;">
+            <form id="addIncomeForm" class="surface-box salary-editor-box">
+              <input type="hidden" id="incomeEntryId" value="" />
+              <div class="surface-head">
+                <div>
+                  <h3 class="surface-title" id="incomeFormTitle">Lançar Entrada no Mês</h3>
+                  <p class="surface-sub">Adicione cada valor que entrou na conta (pagamento dia 5, vale dia 20, PIX, extra...)</p>
                 </div>
               </div>
 
-              <label class="toggle-row">
-                <input type="checkbox" id="inlineSalaryDefaultCheck" checked />
-                <span>Manter este salário como padrão para todos os meses</span>
-              </label>
-
-              <div class="divider-line"></div>
-
-              <div class="field-row-2">
+              <div class="salary-form-body">
                 <div class="field-block">
-                  <label for="inlineExtraInput">Renda Extra neste mês (R$)</label>
-                  <div class="currency-input-wrap">
-                    <span class="currency-prefix mono">R$</span>
-                    <input type="number" step="0.01" min="0" id="inlineExtraInput" class="input-field mono" placeholder="0,00" />
+                  <span class="chip-hint">Preencher rápido:</span>
+                  <div class="quick-salary-chips" style="margin-top: 4px;">
+                    <button type="button" class="quick-val-btn" data-income-preset="Pagamento (Dia 5)" data-preset-day="05">Pagamento (Dia 5)</button>
+                    <button type="button" class="quick-val-btn" data-income-preset="Vale / Adiantamento (Dia 20)" data-preset-day="20">Vale (Dia 20)</button>
+                    <button type="button" class="quick-val-btn" data-income-preset="Renda Extra / PIX" data-preset-day="today">Renda Extra / PIX</button>
+                    <button type="button" class="quick-val-btn" data-income-preset="Bônus / 13º / Férias" data-preset-day="today">Bônus / 13º</button>
                   </div>
                 </div>
-                <div class="field-block">
-                  <label for="inlineExtraNoteInput">Origem da Renda Extra / Observação</label>
-                  <input type="text" id="inlineExtraNoteInput" class="input-field" placeholder="Ex: Freela, bônus, 13º, venda..." />
+
+                <div class="field-row-2">
+                  <div class="field-block">
+                    <label for="incomeNameInput">Descrição da Entrada</label>
+                    <input type="text" id="incomeNameInput" class="input-field" placeholder="Ex: Pagamento Dia 5, Vale Dia 20..." required />
+                  </div>
+                  <div class="field-block">
+                    <label for="incomeAmountInput">Valor que entrou (R$)</label>
+                    <div class="currency-input-wrap">
+                      <span class="currency-prefix mono">R$</span>
+                      <input type="number" step="0.01" min="0.01" id="incomeAmountInput" class="input-field mono" placeholder="0,00" required />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field-row-2">
+                  <div class="field-block">
+                    <label for="incomeDateInput">Data da Entrada</label>
+                    <input type="date" id="incomeDateInput" class="input-field mono" required />
+                  </div>
+                  <div class="field-block">
+                    <label for="incomeNoteInput">Observação (Opcional)</label>
+                    <input type="text" id="incomeNoteInput" class="input-field" placeholder="Ex: Quinzena, horas extras, freela..." />
+                  </div>
+                </div>
+
+                <div class="salary-form-actions">
+                  <button type="submit" class="btn btn-primary" id="incomeSubmitBtn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>
+                    <span id="incomeSubmitBtnText">Adicionar Entrada</span>
+                  </button>
+                  <button type="button" class="btn btn-ghost" id="incomeCancelEditBtn" style="display: none;">
+                    Cancelar Edição
+                  </button>
+                  <span class="save-toast" id="salarySavedFeedback">Entrada salva!</span>
                 </div>
               </div>
+            </form>
 
-              <div class="salary-form-actions">
-                <button type="submit" class="btn btn-primary">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="20 6 9 17 4 12"/></svg>
-                  Salvar Salário e Atualizar Cálculos
-                </button>
-                <span class="save-toast" id="salarySavedFeedback">Salvo com sucesso!</span>
+            <!-- List of Income Entries in the Selected Month -->
+            <div class="surface-box">
+              <div class="surface-head">
+                <div>
+                  <h3 class="surface-title">Entradas Registradas no Mês</h3>
+                  <p class="surface-sub">Todos os valores que entraram neste mês</p>
+                </div>
+              </div>
+              <div class="expense-list" id="incomeEntriesList">
+                <!-- Populated by JS -->
               </div>
             </div>
-          </form>
+          </div>
 
           <!-- Right: Financial Diagnostics & Savings Goal Simulator -->
           <div class="salary-diagnostics-col">
             <div class="surface-box">
               <div class="surface-head">
                 <div>
-                  <h3 class="surface-title">Raio-X do Seu Salário</h3>
-                  <p class="surface-sub">Para onde está indo seu dinheiro neste mês</p>
+                  <h3 class="surface-title">Raio-X das Suas Entradas</h3>
+                  <p class="surface-sub">Para onde está indo o dinheiro que entrou neste mês</p>
                 </div>
               </div>
               <div class="closing-ledger">
                 <div class="ledger-row">
-                  <span class="ledger-label">Salário Base</span>
+                  <span class="ledger-label">(+) Total de Entradas no Mês</span>
                   <span class="ledger-val mono text-emerald" id="ledgerBaseSalary">+ R$ 0,00</span>
-                </div>
-                <div class="ledger-row" id="ledgerExtraRow">
-                  <span class="ledger-label">Renda Extra do Mês</span>
-                  <span class="ledger-val mono text-emerald" id="ledgerExtraIncome">+ R$ 0,00</span>
                 </div>
                 <div class="ledger-divider"></div>
                 <div class="ledger-row">
@@ -474,7 +493,7 @@
               <!-- Interactive Savings Simulator -->
               <div class="simulator-box">
                 <div class="simulator-top">
-                  <span>Simulador: Meta de guardar do salário</span>
+                  <span>Simulador: Meta de guardar das entradas</span>
                   <strong class="mono text-emerald" id="simGoalPctLabel">20%</strong>
                 </div>
                 <input type="range" min="0" max="100" step="1" value="20" id="simGoalSlider" class="range-slider" />
@@ -676,9 +695,9 @@
         <!-- Annual KPI Row -->
         <div class="annual-kpi-grid">
           <div class="surface-box annual-kpi-card">
-            <span class="annual-kpi-label">Ganhos no Ano (Salários + Extras)</span>
+            <span class="annual-kpi-label">Entradas no Ano</span>
             <strong class="annual-kpi-val mono text-emerald" id="annualTotalIncome">R$ 0,00</strong>
-            <span class="annual-kpi-sub" id="annualIncomeSub">Soma dos meses do ano</span>
+            <span class="annual-kpi-sub" id="annualIncomeSub">Soma das entradas do ano</span>
           </div>
           <div class="surface-box annual-kpi-card">
             <span class="annual-kpi-label">Gastos Fixos no Ano (12 meses)</span>
@@ -705,7 +724,7 @@
               <p class="surface-sub">Clique em qualquer mês para abrir os lançamentos daquele mês</p>
             </div>
             <div class="chart-legend">
-              <span><i class="dot-income"></i> Salário</span>
+              <span><i class="dot-income"></i> Entradas</span>
               <span><i class="dot-fixed"></i> Fixos</span>
               <span><i class="dot-variable"></i> Não Fixos</span>
             </div>
